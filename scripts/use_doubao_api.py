@@ -49,12 +49,7 @@ def use_doubao_api_custom(api_key, model, prompt):
 
 
 if __name__ == "__main__":
-    api_key = "ce6fac43-3d59-4dfe-8949-ea1029f42a32"
+    api_key = ""
     prompt = "请给我讲一个笑话"
     test = use_doubao_api(api_key, prompt)
 
-# ep-20250421154507-59xth   Doubao-1.5-pro-256k
-# ep-20250306115053-vzsng   Doubao-1.5-pro-32k
-# ep-20250422015143-6nx9l   Doubao-1.5-thinking-pro
-# ep-20250422003842-v9gn4   DeepSeek-V3
-# ep-20250422013101-xjhks   DeepSeek-R1

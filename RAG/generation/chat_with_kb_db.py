@@ -20,8 +20,8 @@ from RAG.retrieval.contextual_rewrite import retrieve_from_knowledge_base, list_
 
 # 豆包API配置参数
 DOUBAO_API_URL = "https://ark.cn-beijing.volces.com/api/v3"
-DOUBAO_API_KEY = "ce6fac43-3d59-4dfe-8949-ea1029f42a32"  # 请替换为你的API密钥
-DOUBAO_MODEL_ID = "ep-20250306115053-vzsng"  # Doubao-1.5-pro-32k
+DOUBAO_API_KEY = ""  # 请替换为你的API密钥
+DOUBAO_MODEL_ID = ""  # Doubao-1.5-pro-32k
 
 # 对话历史配置
 CHAT_HISTORY_DIR = r"F:\StrivingRendersMeCozy\DeepLearning\ERAG\Data\Conversation"

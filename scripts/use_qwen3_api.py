@@ -29,7 +29,7 @@ def use_qwen3_api(api_key, model, prompt):
     return response
 
 if __name__ == '__main__':
-    api_key = "sk-97b9633f7c9b49fbbe0096f8c574c82c"
+    api_key = ""
     model = "qwen3-32b"
     prompt = "大明最后一个皇帝是谁？"
     use_qwen3_api(api_key=api_key, model=model, prompt=prompt)

@@ -14,13 +14,13 @@ from langchain_core.prompt_values import StringPromptValue,ChatPromptValue
 l_llm_configs = {
     "base_url": "https://ark.cn-beijing.volces.com/api/v3",
     "model": "ep-20250306115053-vzsng",
-    "api_key":"ce6fac43-3d59-4dfe-8949-ea1029f42a32"
+    "api_key":""
 }
 
 db_llm_config = {
     "base_url": "https://ark.cn-beijing.volces.com/api/v3",
     "model": DOUBAO_MODEL_MAPPING["DeepSeek-V3"],
-    "api_key":"ce6fac43-3d59-4dfe-8949-ea1029f42a32"
+    "api_key":""
 }
 
 em_config = {

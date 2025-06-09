@@ -169,7 +169,7 @@ def process_path(api_key, model, input_path, output_dir):
 
 if __name__ == "__main__":
     # 配置参数
-    API_KEY = "ce6fac43-3d59-4dfe-8949-ea1029f42a32"
+    API_KEY = ""
     MODEL = "ep-20250422003842-v9gn4"
     INPUT_PATH = r"F:\StrivingRendersMeCozy\DeepLearning\ERAG\Data\Knowledge_Docs\raw"
     OUTPUT_DIR = r"F:\StrivingRendersMeCozy\DeepLearning\ERAG\Data\SFT_Data"

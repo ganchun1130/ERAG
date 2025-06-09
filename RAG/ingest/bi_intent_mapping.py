@@ -196,7 +196,7 @@ if __name__ == "__main__":
     root_path = r"F:\StrivingRendersMeCozy\DeepLearning\ERAG\Data\Knowledge_Docs"
     csv_root = os.path.join(root_path, "processed")
     output_csv_path = os.path.join(root_path, "ERAG")
-    api_key = "ce6fac43-3d59-4dfe-8949-ea1029f42a32"
+    api_key = ""
 
     bi_intent_mapping(
         api_key,

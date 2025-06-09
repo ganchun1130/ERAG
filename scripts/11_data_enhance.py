@@ -129,7 +129,7 @@ def data_enhance(api_key, model, input_csv, output_csv, batch_size=10):
 
 if __name__ == "__main__":
     # 配置参数
-    API_KEY = "ce6fac43-3d59-4dfe-8949-ea1029f42a32"
+    API_KEY = ""
     MODEL = "ep-20250422013101-xjhks"  # Doubao-1.5-pro-256k
 
     # 输入输出路径

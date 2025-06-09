@@ -26,6 +26,6 @@ def use_deepseek_api(api_key):
     return result
 
 if __name__ == '__main__':
-    api_key = "sk-d40a6d50bdf049e4bbc251af8747db34"
+    api_key = ""
     result = use_deepseek_api(api_key)
     print(result)

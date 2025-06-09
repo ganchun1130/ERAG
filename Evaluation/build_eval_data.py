@@ -21,7 +21,7 @@ from config import DOUBAO_API_URL, DOUBAO_API_KEY, DOUBAO_MODEL_MAPPING
 
 # 设置参数
 EVAL_DATA_DIR = r"/Data/Evaluation/ERAG"
-RAW_DATA_PATH = r"/Data/Evaluation/raw\eval_data.csv"
+RAW_DATA_PATH = r"/Data/Evaluation/raw/eval_data.csv"
 DEFAULT_KB = "All"  # 使用的默认知识库
 
 

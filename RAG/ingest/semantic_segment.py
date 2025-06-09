@@ -153,7 +153,7 @@ if __name__ == "__main__":
     root_path = r"F:\StrivingRendersMeCozy\DeepLearning\ERAG\Data\Knowledge_Docs"
     csv_root = os.path.join(root_path, "raw")
     output_csv_path = os.path.join(root_path, "processed")
-    api_key = "ce6fac43-3d59-4dfe-8949-ea1029f42a32"
+    api_key = ""
 
     semantic_segment(
         api_key=api_key,

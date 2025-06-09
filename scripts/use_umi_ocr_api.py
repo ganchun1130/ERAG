@@ -223,8 +223,8 @@ if __name__ == "__main__":
 
     # 自定义参数示例
     process_ocr(
-        file_path=r"F:\StrivingRendersMeCozy\学习使我快乐\研究生你好\研3\甘淳的大论文\学校发的\计算教育学全书PDF.pdf",
+        file_path=r"",
         extraction_mode="accurate",  # 精准模式
         file_types=["txt"],  # 只需要txt和带文字层PDF
-        download_dir=r"F:\StrivingRendersMeCozy\DeepLearning\ERAG\Data\Knowledge_Docs\raw"  # 自定义下载目录
+        download_dir=r""  # 自定义下载目录
     )

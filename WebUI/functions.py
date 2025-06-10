@@ -20,7 +20,7 @@ EMBEDDING_API_URL = "http://localhost:9997/v1"
 EMBEDDING_MODEL_UID = "bge-m3"
 KNOWLEDGE_BASE_ROOT = r"F:\StrivingRendersMeCozy\DeepLearning\ERAG\Data\Knowledge_Base\jisuanjiaoyuxue"
 VECTOR_DIMENSION = 1024
-API_KEY = "sk-97b9633f7c9b49fbbe0096f8c574c82c"
+API_KEY = ""
 LLM_MODEL = "qwen3-32b"
 
 

@@ -58,10 +58,6 @@ pip install -r requirements.txt
 python ui.py
 ```
 
-### 🌐 在线体验
-
-访问我们的在线演示: [ERAG演示](https://huggingface.co/spaces/example/erag-demo) (示例链接)
-
 ## 📱 使用指南
 
 <div align="center">
@@ -140,3 +136,4 @@ ERAG/
 <div align="center">
   ⭐ 如果您觉得这个项目有用，请给它一个star！
 </div>
+

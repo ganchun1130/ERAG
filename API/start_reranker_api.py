@@ -1,28 +1,12 @@
-# coding:utf-8
-# @File  : start_reranker_api.py
-# @Author: ganchun
-# @Date  :  2025/04/13
-# @Description:
+"""Launch Qwen3-Reranker-0.6B in Xinference."""
+import argparse
+from xinference.client import RESTfulClient
 
-from xinference.client import Client
 
-client = Client("http://localhost:9997")
-# model_uid = client.launch_model(
-#     model_name="bge-reranker-v2-m3",
-#     model_type="rerank",
-#     model_path=r"F:\StrivingRendersMeCozy\DeepLearning\ERAG\Model\EM\bge-reranker-v2-m3"
-# )
-# model = client.get_model(model_uid)
+def main():
+    p = argparse.ArgumentParser(); p.add_argument("model_path"); p.add_argument("--endpoint", default="http://127.0.0.1:9997")
+    args = p.parse_args(); uid = RESTfulClient(args.endpoint).launch_model(model_name="Qwen3-Reranker-0.6B", model_type="rerank", model_path=args.model_path)
+    print(uid)
 
-model = client.get_model("bge-reranker-v2-m3")
-# 以下使用xinference进行验证
-query = "A man is eating pasta."
-corpus = [
-    "A man is eating food.",
-    "A man is eating a piece of bread.",
-    "The girl is carrying a baby.",
-    "A man is riding a horse.",
-    "A woman is playing violin."
-]
-print(model.rerank(corpus, query))
 
+if __name__ == "__main__": main()

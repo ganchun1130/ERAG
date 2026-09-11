@@ -1,139 +1,128 @@
-# 🚀 ERAG - 智能教学问答助手
+# ERAG 教学助手（Enhanced RAG）
 
-<div align="center">
+ERAG 是一个面向中文教学问答的 Enhanced RAG 教学助手，支持 PDF/TXT/Markdown/CSV 知识库、复杂多轮问题、引用来源和本地部署。
 
-![版本](https://img.shields.io/badge/版本-1.0.0-blue)
-![Python](https://img.shields.io/badge/Python-3.8+-green)
-![Gradio](https://img.shields.io/badge/Gradio-3.32+-orange)
-![许可证](https://img.shields.io/badge/许可证-MIT-brightgreen)
-![状态](https://img.shields.io/badge/状态-开发中-yellow)
+## 这次升级解决了什么
 
-</div>
+- **one-model Agent**：Router、检索、回答、反思仍保留为可观测的逻辑角色，但默认共用一个 OpenAI-compatible 模型；通过 `ERAG_RETRIEVAL_MODEL` 可选用更快/更便宜的规划模型。
+- **复杂查询处理**：语义完整分块；块摘要 + 关键问题标签的双向意图映射；情境保留与分治查询；章节路由；摘要局部召回 + 标签/QA 全局补充；可选重排序；TCT 证据审查与反馈检索（最多 3 轮）。
+- **模型可替换**：默认示例使用火山引擎 Ark；同一套代码可切换到 Xinference、vLLM 或其他 OpenAI-compatible 网关。Embedding 默认 `Qwen3-Embedding-0.6B`，Reranker 默认 `Qwen3-Reranker-0.6B`。
+- **可复现索引**：知识库保存 `chunks.json`、向量文件和 `manifest.json`。manifest 固化 embedding 模型、协议、revision 和指令；配置变化时拒绝静默复用旧向量。
+- **Web UI 重写**：Gradio 5/6 兼容界面支持知识库选择、上传构建、进度结果、清空对话和参考来源。
 
-<div align="center">
-  <img src="https://cdn-icons-png.flaticon.com/512/2621/2621230.png" alt="ERAG Logo" width="150">
-</div>
+## 选择模型后端
 
-## 📖 项目简介
+模型后端完全由使用者选择，不需要修改业务代码。设置 `ERAG_BACKEND=ark`、`vllm` 或 `xinference`，再按需覆盖各服务地址：
 
-ERAG是一个为教育领域定制的基于知识库的智能问答系统。它能够根据不同学科知识库提供精准的问答服务，支持知识库的动态构建与切换，实现智能化教学辅助，为师生提供高效的学习和教学体验。
+| 后端 | 适合场景 | 关键配置 |
+|---|---|---|
+| 火山引擎 Ark API | 快速试用、无需本地 GPU、希望降低运维成本 | `ERAG_LLM_BASE_URL`、`ERAG_LLM_API_KEY`、`ERAG_LLM_MODEL` |
+| 本地 vLLM | Linux/GPU 服务器、高并发、需要 OpenAI-compatible 服务 | 将 `ERAG_LLM_BASE_URL` 指向 vLLM `/v1` |
+| 本地 Xinference | 桌面环境、多模型统一管理、同时部署 Embedding/Reranker | 运行 `API/launch_local_models.py` |
 
-### ✨ 核心功能
+Embedding 和 Reranker 也可以独立选择本地服务或兼容 API；因此可以组合成“Ark LLM + 本地 Embedding/Reranker”，不必三者全部部署在同一处。
 
-- 🤖 **智能问答**：基于知识库提供准确的问题回答
-- 📚 **多知识库支持**：包含计算教育学、基础数学理论、机器学习基础等多个学科
-- 📤 **知识库构建**：支持PDF/TXT文件上传，动态扩充知识库
-- 🔍 **智能检索**：精准定位相关信息，提供参考来源
-- 💬 **自然对话**：流畅的对话体验，支持连续提问
-
-## 🛠️ 技术架构
-
-<div align="center">
-  <img src="https://mermaid.ink/img/pako:eNptkc1qwzAQhF9F7CmF5AfYoYcUemkpPbQXX4xYbAVsyUhygyn57o1_ctrCHsTOzszuaqUDtF4hpPDm-o4fTr1FhZAXF0FjR3t0UeGbqdu6fWQXU1a4MgK3ZA2OJPu5CctETG2cVci9Pn1wcfp-OlcVzkoJMkGZFapm8JfCxw7l2fmRLD6UREXn-c23btPeOosxnufDBGunsUv-O_G1O5qBtr9OS2sAww8T07287_BloachYB_JCAVnj5F4QkiL3ls0CC22iSJdKJDyCXPFS4TMTc92pICWmxQhH8Loot1OQmaK0IaquCiKxdP9_RP9epbaRsSA_XVFm5sWF9zJTGYHvMZsZ63C7B8zpLew" alt="ERAG 架构" width="600">
-</div>
-
-- **前端**：基于Gradio构建的交互式Web界面
-- **后端**：Python实现的知识检索与问答处理
-- **UI设计**：自定义CSS样式，提供美观的用户界面
-- **多线程处理**：支持文件异步处理，避免阻塞主界面
-
-## 🚀 快速开始
-
-### 环境要求
-
-- Python 3.8+
-- 相关依赖包
-
-### 安装步骤
+## 快速开始（Ark API）
 
 ```bash
-# 克隆项目
-git clone https://github.com/ganchun1130/ERAG.git
-cd ERAG
-
-# 安装依赖
-pip install -r requirements.txt
-
-# 启动应用
-python ui.py
+python -m venv .venv && source .venv/bin/activate
+pip install -e '.[dev]'
+cp .env.example .env
+# 编辑 .env：填写 ERAG_LLM_API_KEY、ERAG_LLM_MODEL，以及 Embedding 服务地址
+python -m erag.cli build --name 计算教育学 /path/to/教材.pdf
+python -m WebUI.ui
 ```
 
-## 📱 使用指南
+命令行提问：
 
-<div align="center">
-  <img src="https://via.placeholder.com/800x400.png?text=ERAG+使用流程图" alt="使用流程" width="700">
-</div>
-
-1. **选择知识库**：从左侧面板选择要使用的知识库
-2. **提问**：在输入框中输入问题，点击发送或按Enter键
-3. **查看回答**：系统会基于选定知识库提供答案
-4. **参考来源**：点击"显示参考来源"查看答案的知识依据
-5. **上传文件**：点击"选择文件上传"扩充知识库
-6. **新建对话**：点击"新建对话"开始全新会话
-
-## 📂 项目结构
-
-```
-ERAG/
-├── ui.py                  # 主界面实现
-├── css.py                 # CSS样式定义
-├── functions.py           # 核心功能函数
-├── knowledge_base/        # 知识库文件夹
-│   ├── 计算教育学/
-│   ├── 基础数学理论/
-│   └── 机器学习基础/
-├── assets/                # 静态资源文件
-├── tests/                 # 测试文件
-├── requirements.txt       # 项目依赖
-└── README.md              # 项目说明文档
+```bash
+python -m erag.cli list
+python -m erag.cli ask --kb 计算教育学 "比较形成性评价与总结性评价的适用场景"
 ```
 
-## 🧩 功能截图
+## 本地 Xinference（LLM + Embedding + Reranker）
 
-<div align="center">
-  <img src="https://via.placeholder.com/800x450.png?text=ERAG+智能问答界面" alt="智能问答界面" width="700">
-  <p>ERAG智能问答界面</p>
-</div>
+```bash
+pip install -e '.[local]'
+python API/start_xinference.py
+python API/launch_local_models.py \
+  --model-path /models/Qwen3-8B \
+  --embedding-path /models/Qwen3-Embedding-0.6B \
+  --reranker-path /models/Qwen3-Reranker-0.6B
+```
 
-## 🔧 配置说明
+然后将 `.env` 中的 `ERAG_LLM_BASE_URL`、`ERAG_EMBEDDING_BASE_URL`、`ERAG_RERANK_BASE_URL` 都设为 `http://127.0.0.1:9997/v1`，模型名分别设为 `qwen3-instruct`、`Qwen3-Embedding-0.6B`、`Qwen3-Reranker-0.6B`。显存不足时可以只本地部署 embedding/reranker，LLM 继续使用 Ark。更多参数见 [API/README.md](API/README.md)。
 
-系统支持多种配置选项，包括：
+此时在 `.env` 设置 `ERAG_BACKEND=xinference`；如果显式填写了服务地址，则显式地址优先。
 
-| 配置项 | 说明 | 默认值 |
-|-------|------|-------|
-| 知识库路径 | 指定知识库存储位置 | `./knowledge_base` |
-| 检索参数 | 控制检索精确度与范围 | k=3, threshold=0.7 |
-| 界面主题 | 自定义UI界面风格 | `default` |
-| 文件处理 | 文件处理相关参数 | chunk_size=500 |
+## 本地 vLLM
 
-## 📈 未来计划
+vLLM 负责提供 OpenAI-compatible LLM 接口，Embedding/Reranker 可以继续使用 Xinference 或其他兼容服务：
 
-- [ ] 支持更多文件格式（Markdown、Word、PPT等）
-- [ ] 添加用户权限管理和多用户支持
-- [ ] 优化检索算法，提高响应速度和准确性
-- [ ] 增加数据分析功能和使用统计报告
-- [ ] 开发移动端应用，实现跨平台访问
+```bash
+pip install vllm
+vllm serve /models/Qwen3-8B --served-model-name qwen3-instruct --host 127.0.0.1 --port 8000
+```
 
-## 👨‍💻 开发者
+`.env`：
 
-- **开发者**: ganchun
-- **联系方式**: ganchun1130@github.com
-- **贡献指南**: [如何贡献](CONTRIBUTING.md)
+```dotenv
+ERAG_LLM_BASE_URL=http://127.0.0.1:8000/v1
+ERAG_LLM_API_KEY=local
+ERAG_LLM_MODEL=qwen3-instruct
+ERAG_BACKEND=vllm
+```
 
-## 🙏 致谢
+## 配置要点
 
-感谢以下开源项目的支持：
-- [Gradio](https://gradio.app/)
-- [LangChain](https://langchain.com/)
-- [FAISS](https://github.com/facebookresearch/faiss)
+所有配置使用 `ERAG_` 前缀，可放在 `.env` 或环境变量中：
 
-## 📄 许可证
+| 配置 | 作用 | 默认 |
+|---|---|---|
+| `ERAG_BACKEND` | 选择 Ark、vLLM 或 Xinference | `ark` |
+| `ERAG_LLM_BASE_URL` / `ERAG_LLM_MODEL` | 生成、规划和反思模型 | Ark / `doubao-seed-1-6-flash-250615` |
+| `ERAG_RETRIEVAL_MODEL` | 可选的检索规划模型 | 空（与 LLM 相同） |
+| `ERAG_EMBEDDING_MODEL` | 向量模型 | `Qwen3-Embedding-0.6B` |
+| `ERAG_RERANK_ENABLED` / `ERAG_RERANK_MODEL` | Cross-encoder 重排 | true / `Qwen3-Reranker-0.6B` |
+| `ERAG_KNOWLEDGE_BASE_ROOT` | 索引目录 | `./data/knowledge_bases` |
+| `ERAG_MAX_RETRIEVAL_ROUNDS` | TCT 最大检索轮数 | 3 |
+| `ERAG_ENABLE_THINKING` | 是否开启服务商 thinking | false（结构化 JSON 更稳定） |
 
-本项目采用MIT许可证
+Embedding 模型或 instruction 变更后必须重新执行 `build`。不要把 API Key 提交到 Git；`.env` 已被忽略。
 
----
+## 项目结构
 
-<div align="center">
-  ⭐ 如果您觉得这个项目有用，请给它一个star！
-</div>
+```text
+erag/
+  engine.py       # one-model Router + contextual rewrite + TCT
+  knowledge.py    # PDF/TXT 解析、语义分块、双向意图映射、向量索引
+  providers.py    # OpenAI-compatible LLM/Embedding/Rerank 适配器
+  schemas.py      # QueryPlan、Chunk、Hit、Answer 等契约
+  settings.py     # .env/Pydantic 配置
+  cli.py          # build/list/ask
+WebUI/            # Gradio 5/6 界面
+API/              # Xinference 启动与模型加载脚本
+RAG/ Agent/       # 早期实验脚本，保留作对照
+Evaluation/       # RAG 评估脚本
+```
 
+## 从旧版本迁移
+
+旧代码中的 Windows 绝对路径、硬编码 API Key、失败时写入零向量、`qwen2.5`/`bge-m3` 固定 UID 和阻塞式上传逻辑已不再作为主流程。旧 `RAG/` 与 `Agent/` 文件仍保留用于复现实验，但新应用请统一调用 `ERAGEngine`：
+
+```python
+from erag import ERAGEngine, Settings
+
+engine = ERAGEngine(Settings())
+engine.build_knowledge_base(["教材.pdf"], "计算教育学")
+result = engine.ask("请比较两种教学评价方法", "计算教育学", history=[])
+print(result.answer, result.sources, result.trace)
+```
+
+## 评估与扩展
+
+`Evaluation/` 中保留 E-RAGAS/CQRA 实验入口；建议在切换模型或 embedding 后重新跑同一测试集并记录延迟、上下文召回、忠实度、答案相关性和 CQRA。未来可在 `KnowledgeBase` 增加网页/多模态解析，在 `ERAGEngine._answer` 增加引用校验和流式输出。
+
+## 许可证
+
+MIT。模型权重与第三方 API 请遵守各自许可证和服务条款。

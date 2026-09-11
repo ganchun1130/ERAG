@@ -1,0 +1,5 @@
+# Optional local inference environment (install a CUDA/CPU PyTorch build separately).
+xinference>=1.7,<3
+sentence-transformers>=5,<6
+transformers>=4.51,<5
+accelerate>=1.6,<2

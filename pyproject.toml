@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "erag-teaching-assistant"
+version = "2.1.0"
+description = "Thesis-aligned one-model ERAG teaching assistant"
+requires-python = ">=3.11"
+dependencies = ["openai>=1.70,<2", "httpx>=0.28,<1", "numpy>=1.26,<3", "faiss-cpu>=1.10,<2", "pydantic>=2.10,<3", "pydantic-settings>=2.8,<3", "gradio>=5.23,<7", "pypdf>=6,<7"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "ruff>=0.11,<1"]
+local = ["xinference>=1.7,<2", "transformers>=4.51,<5", "sentencepiece>=0.2,<1", "accelerate>=1.6,<2"]
+all = ["xinference>=1.7,<2", "transformers>=4.51,<5", "sentencepiece>=0.2,<1", "accelerate>=1.6,<2", "pytest>=8,<10"]
+
+[project.scripts]
+erag = "erag.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["erag*", "Agent*", "WebUI*", "Prompt*", "RAG*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 110

@@ -82,7 +82,6 @@ class KnowledgeBase:
         self.chunks: list[Chunk] = []
         self.summary_vectors: np.ndarray | None = None
         self.tag_vectors: np.ndarray | None = None
-        self.qa_vectors: np.ndarray | None = None
 
     @property
     def manifest_path(self): return self.root / "manifest.json"
@@ -102,17 +101,12 @@ class KnowledgeBase:
             raise ValueError("没有可写入知识库的内容")
         summaries = [c.summary or c.content for c in self.chunks]
         tags = ["；".join(c.tags) or c.content[:100] for c in self.chunks]
-        # Keep a separate QA/global view. QA chunks are intentionally broad and are
-        # searched with key_query during contextual retrieval.
-        qa = [c.content for c in self.chunks if c.kind == "qa"] or summaries
         self.summary_vectors = self.providers.embed(summaries)
         self.tag_vectors = self.providers.embed(tags)
-        self.qa_vectors = self.providers.embed(qa)
         self.root.mkdir(parents=True, exist_ok=True)
         (self.root / "chunks.json").write_text(json.dumps([c.model_dump() for c in self.chunks], ensure_ascii=False, indent=2), encoding="utf-8")
         np.save(self.root / "summary.npy", self.summary_vectors)
         np.save(self.root / "tags.npy", self.tag_vectors)
-        np.save(self.root / "qa.npy", self.qa_vectors)
         self.manifest_path.write_text(json.dumps({"version": 2, "name": self.name,
             "embedding": self.settings.embedding_identity(), "chunk_count": len(self.chunks)}, ensure_ascii=False, indent=2), encoding="utf-8")
         return len(self.chunks)
@@ -126,7 +120,6 @@ class KnowledgeBase:
         self.chunks = [Chunk.model_validate(x) for x in json.loads((self.root / "chunks.json").read_text(encoding="utf-8"))]
         self.summary_vectors = np.load(self.root / "summary.npy")
         self.tag_vectors = np.load(self.root / "tags.npy")
-        self.qa_vectors = np.load(self.root / "qa.npy")
         return self
 
     def search(self, query: str, *, key_query: str | None = None, chapter: str = "", top_k: int = 8) -> list[Hit]:
@@ -137,7 +130,6 @@ class KnowledgeBase:
         key_scores = None
         if key_query:
             kq = self.providers.embed([key_query], query=True)
-            key_scores, _ = self._index(self.tag_vectors, kq, len(self.chunks))
             key_scores = (kq @ self.tag_vectors.T)[0]
         hits: list[Hit] = []
         for score, idx in zip(scores[0], indices[0]):

@@ -5,7 +5,7 @@ ERAG 是一个面向中文教学问答的 Enhanced RAG 教学助手，支持 PDF
 ## 这次升级解决了什么
 
 - **one-model Agent**：Router、检索、回答、反思仍保留为可观测的逻辑角色，但默认共用一个 OpenAI-compatible 模型；通过 `ERAG_RETRIEVAL_MODEL` 可选用更快/更便宜的规划模型。
-- **复杂查询处理**：语义完整分块；块摘要 + 关键问题标签的双向意图映射；情境保留与分治查询；章节路由；摘要局部召回 + 标签/QA 全局补充；可选重排序；TCT 证据审查与反馈检索（最多 3 轮）。
+- **复杂查询处理**：语义完整分块；块摘要 + 关键问题标签的双向意图映射；情境保留与分治查询；章节路由；摘要召回 + 标签意图补充；可选重排序；TCT 证据审查与反馈检索（最多 3 轮）。
 - **模型可替换**：默认示例使用火山引擎 Ark；同一套代码可切换到 Xinference、vLLM 或其他 OpenAI-compatible 网关。Embedding 默认 `Qwen3-Embedding-0.6B`，Reranker 默认 `Qwen3-Reranker-0.6B`。
 - **可复现索引**：知识库保存 `chunks.json`、向量文件和 `manifest.json`。manifest 固化 embedding 模型、协议、revision 和指令；配置变化时拒绝静默复用旧向量。
 - **Web UI 重写**：Gradio 5/6 兼容界面支持知识库选择、上传构建、进度结果、清空对话和参考来源。
@@ -102,13 +102,12 @@ erag/
   cli.py          # build/list/ask
 WebUI/            # Gradio 5/6 界面
 API/              # Xinference 启动与模型加载脚本
-RAG/ Agent/       # 早期实验脚本，保留作对照
-Evaluation/       # RAG 评估脚本
+tests/            # 核心行为测试
 ```
 
 ## 从旧版本迁移
 
-旧代码中的 Windows 绝对路径、硬编码 API Key、失败时写入零向量、`qwen2.5`/`bge-m3` 固定 UID 和阻塞式上传逻辑已不再作为主流程。旧 `RAG/` 与 `Agent/` 文件仍保留用于复现实验，但新应用请统一调用 `ERAGEngine`：
+项目主流程统一调用 `ERAGEngine`，不再依赖旧版脚本、硬编码路径或固定模型 UID：
 
 ```python
 from erag import ERAGEngine, Settings
@@ -119,9 +118,15 @@ result = engine.ask("请比较两种教学评价方法", "计算教育学", hist
 print(result.answer, result.sources, result.trace)
 ```
 
-## 评估与扩展
+## 测试与扩展
 
-`Evaluation/` 中保留 E-RAGAS/CQRA 实验入口；建议在切换模型或 embedding 后重新跑同一测试集并记录延迟、上下文召回、忠实度、答案相关性和 CQRA。未来可在 `KnowledgeBase` 增加网页/多模态解析，在 `ERAGEngine._answer` 增加引用校验和流式输出。
+运行核心测试：
+
+```bash
+pytest
+```
+
+未来可在 `KnowledgeBase` 增加网页/多模态解析，在 `ERAGEngine._answer` 增加引用校验和流式输出。
 
 ## 许可证
 

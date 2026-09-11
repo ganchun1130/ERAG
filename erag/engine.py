@@ -49,7 +49,7 @@ class ERAGEngine:
                 except Exception as exc:
                     log.warning("块 %s enrichment 失败，使用离线摘要: %s", i, exc)
                 chunks.append(Chunk(id=str(uuid.uuid4()), content=content, summary=summary,
-                    tags=tags, source=str(path), chapter=chapter, page=page, kind="local"))
+                    tags=tags, source=str(path), chapter=chapter, page=page))
         kb = KnowledgeBase(self.settings.knowledge_base_root, kb_name, self.providers, self.settings)
         count = kb.build(chunks)
         return {"name": kb_name, "chunks": count, "path": str(kb.root), "embedding": self.settings.embedding_identity()}

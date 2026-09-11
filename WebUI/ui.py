@@ -13,7 +13,7 @@ from .css import complete_css
 def create_interface():
     initial = list_knowledge_bases()
     with gr.Blocks(title="ERAG 教学助手", css=complete_css) as demo:
-        gr.Markdown("# ERAG 教学助手\n基于论文提出的情境改写、双向意图映射与 TCT 反思流程。")
+        gr.Markdown("# ERAG 教学助手\n支持情境改写、双向意图映射与 TCT 反思流程。")
         with gr.Row():
             with gr.Column(scale=1, min_width=280):
                 kb = gr.Dropdown(initial, value=initial[0] if initial else None, label="知识库", allow_custom_value=False)

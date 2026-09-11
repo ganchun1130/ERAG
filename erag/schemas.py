@@ -1,4 +1,3 @@
-from typing import Literal
 from pydantic import BaseModel, Field, StrictBool
 
 
@@ -10,7 +9,6 @@ class Chunk(BaseModel):
     source: str
     chapter: str = ""
     page: int | None = None
-    kind: Literal["local", "qa"] = "local"
 
 
 class SubQuery(BaseModel):

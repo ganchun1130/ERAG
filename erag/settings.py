@@ -27,7 +27,6 @@ class Settings(BaseSettings):
     rerank_api_key: SecretStr = SecretStr("local")
     rerank_model: str = "Qwen3-Reranker-0.6B"
     knowledge_base_root: Path = ROOT / "data" / "knowledge_bases"
-    sub_query_top_k: int = Field(5, ge=1, le=50)
     per_query_top_k: int = Field(4, ge=1, le=20)
     final_top_k: int = Field(15, ge=1, le=100)
     summary_min_score: float = Field(0.2, ge=-1, le=1)
@@ -41,7 +40,6 @@ class Settings(BaseSettings):
     ui_host: str = "127.0.0.1"
     ui_port: int = Field(7860, ge=1, le=65535)
     enable_thinking: bool = False
-    log_level: str = "INFO"
 
     def model_post_init(self, __context):
         """Make backend selection useful while preserving explicit URL overrides."""

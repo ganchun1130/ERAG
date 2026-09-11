@@ -18,7 +18,7 @@ all = ["xinference>=1.7,<2", "transformers>=4.51,<5", "sentencepiece>=0.2,<1", "
 erag = "erag.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["erag*", "Agent*", "WebUI*", "Prompt*", "RAG*"]
+include = ["erag*", "WebUI*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

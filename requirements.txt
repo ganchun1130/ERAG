@@ -1,4 +1,5 @@
 # Runtime dependencies. For local Xinference models use: pip install -e '.[local]'.
+# Optional local inference environment (install a CUDA/CPU PyTorch build separately).
 openai>=1.70,<2
 httpx>=0.28,<1
 numpy>=1.26,<3
@@ -7,3 +8,7 @@ pydantic>=2.10,<3
 pydantic-settings>=2.8,<3
 gradio>=5.23,<7
 pypdf>=6,<7
+xinference>=1.7,<3
+sentence-transformers>=5,<6
+transformers>=4.51,<5
+accelerate>=1.6,<2

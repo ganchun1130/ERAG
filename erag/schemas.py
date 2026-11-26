@@ -1,4 +1,8 @@
-from pydantic import BaseModel, Field, StrictBool
+from typing import Annotated
+
+from pydantic import BaseModel, Field, StrictBool, StringConstraints
+
+QueryText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
 
 
 class Chunk(BaseModel):
@@ -12,25 +16,34 @@ class Chunk(BaseModel):
 
 
 class SubQuery(BaseModel):
-    query: str = Field(min_length=1, max_length=1000)
+    query: QueryText
     chapter: str = ""
 
 
 class QueryPlan(BaseModel):
     needs_retrieval: StrictBool = True
     question_type: str = "概念解释"
-    key_query: str = Field(min_length=1, max_length=1000)
+    key_query: QueryText
     sub_queries: list[SubQuery] = Field(min_length=1, max_length=5)
 
 
 class Review(BaseModel):
     complete: StrictBool
-    missing_queries: list[str] = Field(default_factory=list, max_length=5)
+    missing_queries: list[QueryText] = Field(default_factory=list, max_length=5)
+
+
+class Enrichment(BaseModel):
+    summary: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
+    tags: list[QueryText] = Field(min_length=1, max_length=3)
+
+
+class GeneratedAnswer(BaseModel):
+    answer: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class Hit(BaseModel):
     chunk: Chunk
-    score: float
+    score: float = Field(allow_inf_nan=False)
     sub_query: str
     route: str
 

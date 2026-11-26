@@ -2,10 +2,14 @@
 
 ERAG 同时支持火山引擎 Ark 和本地 OpenAI-compatible 服务。推荐先启动 Xinference，再按需加载 Qwen3 指令模型、Qwen3 Embedding 与 Qwen3 Reranker；模型 UID 要与 `.env` 保持一致。
 
+完整下载、版本固定和数据资源说明见 [资源指南](../docs/resources.md)。下载后可直接运行 `python -m erag.services.launch_local_models --resources-root resources`，无需手动填写带 revision 的目录。下面的显式路径形式仍然支持。
+
+已验证的 A800 / CUDA 12.4 环境、FastAPI 兼容约束和多 GPU 启动方式见 [远程部署](../docs/remote-validation.md)。加载后运行 `python -m erag.services.check_models --env-file .env` 检查真实接口，不能只确认服务端口已打开。
+
 ```bash
 pip install -e '.[local]'
-python API/start_xinference.py --host 127.0.0.1 --port 9997
-python API/launch_local_models.py \
+python -m erag.services.start_xinference --host 127.0.0.1 --port 9997
+python -m erag.services.launch_local_models \
   --model-path /models/Qwen3-8B \
   --embedding-path /models/Qwen3-Embedding-0.6B \
   --reranker-path /models/Qwen3-Reranker-0.6B
@@ -14,12 +18,14 @@ python API/launch_local_models.py \
 `.env` 本地配置示例：
 
 ```dotenv
+ERAG_BACKEND=xinference
 ERAG_LLM_BASE_URL=http://127.0.0.1:9997/v1
 ERAG_LLM_API_KEY=local
 ERAG_LLM_MODEL=qwen3-instruct
 ERAG_EMBEDDING_BASE_URL=http://127.0.0.1:9997/v1
 ERAG_EMBEDDING_API_KEY=local
 ERAG_EMBEDDING_MODEL=Qwen3-Embedding-0.6B
+ERAG_EMBEDDING_REVISION=97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3
 ERAG_RERANK_BASE_URL=http://127.0.0.1:9997/v1
 ERAG_RERANK_API_KEY=local
 ERAG_RERANK_MODEL=Qwen3-Reranker-0.6B

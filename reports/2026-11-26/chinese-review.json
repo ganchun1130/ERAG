@@ -1,0 +1,11 @@
+{
+  "reviewer": "Codex assistant; qualitative audit, not independent human annotation",
+  "scope": "3 autonomous six-turn profiles plus one unknown-answer question",
+  "findings": [
+    "All profiles gave the correct 35/45-point split and weeks, protected the abnormal-peer-score condition, used the individual-log 10% penalty and retained fixed scores after remedial learning.",
+    "Turn 2 in all profiles abbreviated 每次实验日志最多修改两次 to 形成性评价允许修改两次; the object and upper-bound wording should be clearer. Do not score as perfect pedagogical correctness.",
+    "dual15 turn 3 cited only the peer-review passage while adding the 45-point summative total; the fact existed in history but that citation does not support it. raw50 returned the summative passage first.",
+    "Unknown-answer response correctly stated that remedial dates and the registration link are not published; no URL or date was invented.",
+    "Focused TCT produced identical six answers to raw50 without TCT in this run, increasing chat calls from 12 to 18."
+  ]
+}

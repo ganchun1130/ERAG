@@ -1,0 +1,8 @@
+# CUDA 12.4 deployment stack; install torch from the official cu124 wheel index first.
+torch==2.6.0
+transformers==4.53.3
+xinference==1.13.0
+sentence-transformers==5.7.0
+huggingface-hub==0.36.2
+# Xinference metrics middleware breaks with FastAPI >=0.137 (upstream issue #5063).
+fastapi==0.136.3

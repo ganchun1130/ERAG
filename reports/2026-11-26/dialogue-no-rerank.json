@@ -1,0 +1,15 @@
+{
+  "turns": 36,
+  "variants": {
+    "resolved_history": {
+      "count": 36,
+      "labeled_turns": 34,
+      "recall5": 0.7181372549019607,
+      "all_evidence": 0.5588235294117647,
+      "word_f1": 0.40108942882783927,
+      "chat_calls": 79,
+      "elapsed_s": 304.53814685717225,
+      "review_queries": 0
+    }
+  }
+}

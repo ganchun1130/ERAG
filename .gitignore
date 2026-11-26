@@ -8,3 +8,12 @@ data/
 tmp/
 *.egg-info/
 dist/
+resources/
+build/
+.coverage
+htmlcov/
+.conda/
+.cache/
+logs/
+.DS_Store
+._*

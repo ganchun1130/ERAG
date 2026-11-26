@@ -1,4 +1,4 @@
-"""Download all pinned models/data, or a selected subset, without executing repo code."""
+"""Download pinned models by default; fetch evaluation datasets only when requested."""
 
 from __future__ import annotations
 
@@ -128,23 +128,27 @@ def download(
     return lock
 
 
-def main() -> None:
+def main(argv=None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--root", type=Path, default=Path("resources"))
-    parser.add_argument(
-        "--only", nargs="+", help="llm embedding reranker retrieval-data retrieval-labels mtrag；默认全部"
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument(
+        "--only", nargs="+", help="llm embedding reranker retrieval-data retrieval-labels mtrag；默认仅模型"
     )
+    selection.add_argument("--all", action="store_true", help="下载全部模型和可选评测数据")
     parser.add_argument("--dry-run", action="store_true", help="只显示下载计划，不访问网络")
     parser.add_argument("--metadata-only", action="store_true", help="只下载说明、许可证和配置，用于验证连接")
     parser.add_argument("--max-workers", type=int, default=4)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     resources = read_manifest(args.manifest)
     if args.only:
         unknown = set(args.only) - {r["name"] for r in resources}
         if unknown:
             parser.error(f"未知资源: {sorted(unknown)}")
         resources = [r for r in resources if r["name"] in args.only]
+    elif not args.all:
+        resources = [r for r in resources if r["repo_type"] == "model"]
     if not 1 <= args.max_workers <= 32:
         parser.error("max-workers 必须在 1 到 32 之间")
     print(

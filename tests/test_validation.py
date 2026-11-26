@@ -1,6 +1,3 @@
-import json
-from pathlib import Path
-
 import pytest
 
 from benchmarks.validate_real_models import (
@@ -9,7 +6,7 @@ from benchmarks.validate_real_models import (
     legacy_filter,
     verify_reused_fixture,
 )
-from erag.knowledge import KnowledgeBase, split_semantic
+from erag.knowledge import KnowledgeBase
 
 
 def measured_fake(providers, monkeypatch):
@@ -28,13 +25,23 @@ def measured_fake(providers, monkeypatch):
     monkeypatch.setattr(providers, "rerank", rerank)
 
 
-def test_validation_fixture_labels_match_actual_splitter():
-    root = Path(__file__).resolve().parents[1] / "examples" / "validation"
-    fixture = json.loads((root / "cases.json").read_text(encoding="utf-8"))
-    chunks = split_semantic((root / "course.md").read_text(encoding="utf-8"))
-    chapter_counts = {chapter: sum(c[1] == chapter for c in chunks) for _, chapter, _ in chunks}
-    for case in fixture["retrieval"]:
-        assert all(chapter_counts.get(chapter) == 1 for chapter in case["chapters"])
+@pytest.mark.parametrize("kind", ["chat", "full"])
+def test_validation_requires_external_fixture_before_creating_output(kind, tmp_path, capsys):
+    from benchmarks.validate_chat import main as chat_main
+    from benchmarks.validate_real_models import main as full_main
+
+    output = tmp_path / "output"
+    main = chat_main if kind == "chat" else full_main
+    output_flag = "--output" if kind == "chat" else "--output-dir"
+    fixture_flag = "--fixture" if kind == "chat" else "--fixture-dir"
+    arguments = [output_flag, str(output), "--env-file", str(tmp_path / ".env")]
+    with pytest.raises(SystemExit) as exc:
+        main(arguments)
+    assert exc.value.code == 2 and fixture_flag in capsys.readouterr().err
+    with pytest.raises(SystemExit) as exc:
+        main([*arguments, fixture_flag, str(tmp_path / "missing")])
+    assert exc.value.code == 2 and "测试集缺少文件" in capsys.readouterr().err
+    assert not output.exists()
 
 
 def test_legacy_ablation_reproduces_and_filter(settings, providers, chunks):

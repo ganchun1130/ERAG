@@ -1,4 +1,11 @@
-"""Run a reproducible real-service smoke test; save raw evidence without auto-grading prose."""
+"""Run a real-service smoke test with explicitly supplied data.
+
+--fixture-dir must contain course.md and cases.json. The JSON contains description
+(string) and retrieval (objects with query and chapters, matching Markdown headings).
+Unless --retrieval-only is set, also provide dialogue (question strings) and
+unanswerable (one question absent from the material). Optional batch_key sets the
+shared retrieval query for the batching comparison. Answers need manual review.
+"""
 
 from __future__ import annotations
 
@@ -139,7 +146,8 @@ def compare_retrieval(kb, cases, *, k=3, repeats=3, seed=27):
     }
 
 
-def compare_batching(kb, queries, repeats=3, key="星桥课程的评价与实验规则"):
+def compare_batching(kb, queries, repeats=3, key=None):
+    key = key or queries[0]
     providers, result = kb.providers, {"sequential": [], "batched": []}
     subs = [SubQuery(query=q) for q in queries[:5]]
     for repeat in range(repeats + 1):
@@ -197,14 +205,19 @@ def main(argv=None):
     parser.add_argument("--env-file", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True, help="必须是新的目录，防止覆盖已有实验")
     parser.add_argument("--repeats", type=int, default=3)
-    parser.add_argument("--fixture-dir", type=Path, default=ROOT / "examples" / "validation")
+    parser.add_argument(
+        "--fixture-dir", type=Path, required=True, help="包含 course.md 和 cases.json 的自备测试集"
+    )
     parser.add_argument("--retrieval-only", action="store_true", help="只做建库和检索消融，不运行对话")
     parser.add_argument("--reuse-index", type=Path, help="复用已有知识库目录，在相同索引上比较回答逻辑")
     args = parser.parse_args(argv)
     if args.repeats < 1:
         parser.error("repeats 必须大于 0")
-    args.output_dir.mkdir(parents=True, exist_ok=False)
+    for filename in ("course.md", "cases.json"):
+        if not (args.fixture_dir / filename).is_file():
+            parser.error(f"测试集缺少文件：{args.fixture_dir / filename}")
     fixture = json.loads((args.fixture_dir / "cases.json").read_text(encoding="utf-8"))
+    args.output_dir.mkdir(parents=True, exist_ok=False)
     settings = Settings(
         _env_file=args.env_file,
         knowledge_base_root=args.output_dir / "knowledge_bases",
@@ -299,7 +312,7 @@ def main(argv=None):
                 kb,
                 [c["query"] for c in cases],
                 repeats=args.repeats,
-                key=fixture.get("batch_key", "星桥课程的评价与实验规则"),
+                key=fixture.get("batch_key", cases[0]["query"]),
             )
             save()
         report["dialogues"] = {}

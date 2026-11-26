@@ -1,4 +1,9 @@
-"""Build a real teaching KB and replay autonomous Chinese dialogue regression cases."""
+"""Build a real teaching KB and replay autonomous dialogue regression cases.
+
+Supply --fixture with course.md and cases.json. The JSON contains dialogue
+(a list of questions) and unanswerable (one question absent from the material).
+No teaching material or historical output is bundled with the source code.
+"""
 
 import argparse
 import hashlib
@@ -10,14 +15,19 @@ from benchmarks.validate_real_models import run_dialogue
 from erag import ERAGEngine, Settings
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--env-file", type=Path, default=Path(".env"))
-    parser.add_argument("--fixture", type=Path, default=Path("examples/validation"))
-    args = parser.parse_args()
-    args.output.mkdir(parents=True, exist_ok=False)
+    parser.add_argument(
+        "--fixture", type=Path, required=True, help="包含 course.md 和 cases.json 的自备测试集"
+    )
+    args = parser.parse_args(argv)
+    for filename in ("course.md", "cases.json"):
+        if not (args.fixture / filename).is_file():
+            parser.error(f"测试集缺少文件：{args.fixture / filename}")
     fixture = json.loads((args.fixture / "cases.json").read_text())
+    args.output.mkdir(parents=True, exist_ok=False)
     settings = Settings(
         _env_file=args.env_file,
         knowledge_base_root=args.output / "knowledge_bases",

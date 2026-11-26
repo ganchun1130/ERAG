@@ -7,6 +7,21 @@ from erag.resources import DEFAULT_MANIFEST, download, downloaded_path, read_man
 from erag.services.launch_local_models import launch_spec, main
 
 
+@pytest.mark.parametrize(
+    "arguments,expected",
+    [
+        ([], {"llm", "embedding", "reranker"}),
+        (["--only", "mtrag"], {"mtrag"}),
+        (["--all"], {"llm", "embedding", "reranker", "retrieval-data", "retrieval-labels", "mtrag"}),
+    ],
+)
+def test_download_plan_does_not_fetch_datasets_implicitly(arguments, expected, capsys):
+    from erag.resources import main as download_main
+
+    download_main([*arguments, "--dry-run"])
+    assert {r["name"] for r in json.loads(capsys.readouterr().out)["resources"]} == expected
+
+
 def test_manifest_pins_every_model_and_dataset():
     resources = read_manifest(DEFAULT_MANIFEST)
     assert {r["name"] for r in resources} == {

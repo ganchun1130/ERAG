@@ -100,4 +100,10 @@ python -m benchmarks.expanded_retrieval --help
 python -m benchmarks.evaluate_dialogues --help
 ```
 
+## 迁移到另一台机器
+
+只迁移源码与配置模板即可，不需要复制 `.conda`、`.venv` 或缓存。基础依赖可用 `pip install -r requirements.txt` 安装；该文件引用 `pyproject.toml`，因此需要在完整仓库内执行。本地 GPU 推理按 [部署指南](docs/deployment.md) 安装 PyTorch 和 `config/remote-requirements.lock`。
+
+`resources/models/` 是可选携带的模型权重；不复制时运行下载器重新获取。`.env` 包含机器相关配置和可能的密钥，应在新机器上按模板重新填写。删除运行环境前先停止网页和模型服务；停止后可删除整个 `.conda/`、`.cache/` 和不需要的日志。
+
 MIT；模型、第三方数据及服务遵守各自许可证与条款。

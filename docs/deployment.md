@@ -4,7 +4,7 @@
 
 ## 环境
 
-`scripts/remote_runtime.sh` 使用项目内 `.conda/envs/erag`，并将缓存集中到 `.cache/`。已有环境时无需重新创建。
+`scripts/remote_runtime.sh` 使用项目内 `.conda/envs/erag`，并将缓存集中到 `.cache/`。运行环境不随源码分发；迁移到新机器后重新创建，已有环境时无需重复创建。也可使用自己管理的 Python 环境，直接运行 `erag-*` 命令。
 
 ```bash
 mkdir -p logs .cache .conda/envs
@@ -50,8 +50,8 @@ ssh -N -J my-jump -L 7860:127.0.0.1:7860 user@GPU_HOST
 
 ## 清理边界
 
-- `.conda/envs/erag` 是运行环境，删除后需要重装；不是可随意清除的缓存。
-- `.cache/xinference` 保存模型注册及服务状态，运行时保留。
+- `.conda/envs/erag` 是可重新创建的运行环境。先停止网页和模型服务，再删除 `.conda/`；新机器按上面的命令重装即可。
+- `.cache/xinference` 保存模型注册及服务状态，运行时保留；所有服务停止后可随 `.cache/` 一起删除。
 - 安装完成且无安装任务时，可清理下载缓存；不要清理环境所依赖的符号链接目标。
 - 停止网页后可删除 `data/`，这会清空知识库、历史会话和浏览器密钥。再次启动会生成新的空状态。
 - `resources/datasets/` 只用于评测，可删除并按需重新下载。`resources/models/` 是本地模型权重。

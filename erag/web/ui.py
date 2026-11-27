@@ -354,6 +354,8 @@ def main() -> None:
         server_name=settings.ui_host,
         server_port=settings.ui_port,
         css=complete_css,
+        # A custom data root can put conversation exports outside the working directory.
+        allowed_paths=[str((settings.knowledge_base_root.parent / "exports").resolve())],
     )
 
 

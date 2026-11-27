@@ -26,6 +26,7 @@ jobs:
       - name: Check installed entry points
         run: |
           erag --help
+          erag-ui --help
           erag-download --dry-run
           erag-models --help
           erag-server --help

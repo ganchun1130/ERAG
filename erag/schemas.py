@@ -1,6 +1,7 @@
+import json
 from typing import Annotated
 
-from pydantic import BaseModel, Field, StrictBool, StringConstraints
+from pydantic import BaseModel, Field, JsonValue, StrictBool, StringConstraints, field_validator
 
 QueryText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
 
@@ -13,6 +14,20 @@ class Chunk(BaseModel):
     source: str
     chapter: str = ""
     page: int | None = None
+    metadata: dict[str, JsonValue] = Field(default_factory=dict)
+
+    @field_validator("id", "content", "source")
+    @classmethod
+    def nonblank(cls, value):
+        if not value.strip():
+            raise ValueError("知识块 id、content、source 不能只包含空白")
+        return value
+
+    @field_validator("metadata")
+    @classmethod
+    def finite_metadata(cls, value):
+        json.dumps(value, allow_nan=False)
+        return value
 
 
 class SubQuery(BaseModel):

@@ -15,11 +15,11 @@ _engine_lock = Lock()
 _configured_engines: dict[tuple[bool, bool], ERAGEngine] = {}
 
 
-def get_engine() -> ERAGEngine:
+def get_engine(settings: Settings | None = None) -> ERAGEngine:
     global _engine
     with _engine_lock:
         if _engine is None:
-            _engine = ERAGEngine(Settings())
+            _engine = ERAGEngine(settings or Settings())
             atexit.register(_engine.close)
     return _engine
 

@@ -1,0 +1,10 @@
+{
+  "extension_factory": "erag.integrations.external_knowledge:create_extensions",
+  "extension_options": {
+    "endpoint": "http://127.0.0.1:9000/retrieval",
+    "knowledge_bases": {"我的外部资料": "replace-with-your-knowledge-id"},
+    "api_key_env": "MY_KNOWLEDGE_API_KEY",
+    "score_threshold": 0.0
+  },
+  "rerank_enabled": false
+}

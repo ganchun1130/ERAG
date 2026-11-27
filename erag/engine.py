@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import re
 from collections import OrderedDict
+from collections.abc import Iterable
 from pathlib import Path
 from threading import RLock
 
-from .knowledge import KnowledgeBase, list_knowledge_bases, read_document, split_semantic
+from .extensions import Extensions, KnowledgeIndex, load_extensions
+from .ingestion import DocumentPipeline
+from .knowledge import KnowledgeBase, list_knowledge_bases, validate_name
 from .providers import Providers, parse_json
 from .schemas import Answer, Chunk, Enrichment, GeneratedAnswer, Hit, QueryPlan, Review, SubQuery
 from .settings import Settings
@@ -78,31 +80,57 @@ def citation_issue(answer: str, source_count: int) -> str | None:
 
 
 class ERAGEngine:
-    def __init__(self, settings: Settings | None = None, providers: Providers | None = None):
+    def __init__(
+        self,
+        settings: Settings | None = None,
+        providers: Providers | None = None,
+        *,
+        extensions: Extensions | None = None,
+    ):
         self.settings = settings or Settings()
-        self.providers = providers or Providers(self.settings)
-        self._cache: OrderedDict[str, tuple[tuple, KnowledgeBase]] = OrderedDict()
+        self.extensions = extensions.validate() if extensions is not None else load_extensions(self.settings)
+        if providers is not None and any(
+            x is not None for x in (self.extensions.chat, self.extensions.embedding, self.extensions.reranker)
+        ):
+            raise ValueError("providers 与模型扩展不能同时传入，请选择一种注入方式")
+        self.providers = (
+            providers if providers is not None else Providers(self.settings, extensions=self.extensions)
+        )
+        self.ingestion = self.extensions.ingestion or DocumentPipeline()
+        self._cache: OrderedDict[str, tuple[object, KnowledgeIndex]] = OrderedDict()
         self._cache_lock = RLock()
 
-    def _kb(self, name: str) -> KnowledgeBase:
-        kb = KnowledgeBase(self.settings.knowledge_base_root, name, self.providers, self.settings)
+    @property
+    def upload_extensions(self) -> list[str]:
+        return self.extensions.upload_extensions or [".pdf", ".txt", ".md", ".markdown", ".csv"]
+
+    def _prompt(self, key: str, default: str) -> str:
+        return self.settings.prompts.get(key, default)
+
+    def _new_index(self, name: str) -> KnowledgeIndex:
+        validate_name(name)
+        if self.extensions.knowledge is not None:
+            return self.extensions.knowledge.open(name, self.providers, self.settings)
+        return KnowledgeBase(self.settings.knowledge_base_root, name, self.providers, self.settings)
+
+    def open_knowledge_base(self, name: str) -> KnowledgeIndex:
+        """Load an index through the configured repository, without assuming local files."""
+        return self._kb(name)
+
+    def _kb(self, name: str) -> KnowledgeIndex:
+        kb = self._new_index(name)
         try:
-            stat = kb.manifest_path.stat()
+            signature = kb.cache_token()
         except FileNotFoundError:
             raise FileNotFoundError(f"知识库不存在或未完成构建: {name}") from None
-        signature = (
-            str(kb.root),
-            stat.st_mtime_ns,
-            stat.st_size,
-            stat.st_ino,
-            json.dumps(self.settings.embedding_identity(), sort_keys=True),
-        )
+        if signature is None:
+            return kb.load()
         with self._cache_lock:
             cached = self._cache.get(name)
             if cached and cached[0] == signature:
                 self._cache.move_to_end(name)
                 return cached[1]
-            kb.load()
+            kb = kb.load()
             if self.settings.kb_cache_size:
                 self._cache[name] = (signature, kb)
                 self._cache.move_to_end(name)
@@ -114,7 +142,7 @@ class ERAGEngine:
         payload = {"content": content, "chapter": chapter, "output_schema": Enrichment.model_json_schema()}
         for attempt in range(2):
             try:
-                result = self.providers.json(ENRICH_PROMPT, payload)
+                result = self.providers.json(self._prompt("enrich", ENRICH_PROMPT), payload)
                 return Enrichment.model_validate(result), attempt
             except ValueError as exc:
                 # Repair model JSON/schema errors once; HTTP retries remain the SDK's responsibility.
@@ -124,59 +152,50 @@ class ERAGEngine:
         raise AssertionError("unreachable")
 
     def build_knowledge_base(self, files: list[str | Path], name: str | None = None) -> dict:
+        if not self.extensions.can_build:
+            raise ValueError("当前知识库由外部服务管理，请在该服务中构建或更新资料")
         if not files:
-            raise ValueError("至少提供一个 PDF/TXT/MD/CSV 文件")
-        kb = KnowledgeBase(
-            self.settings.knowledge_base_root, name or Path(files[0]).stem, self.providers, self.settings
-        )
+            raise ValueError("至少提供一个文件")
+        name = validate_name(name or Path(files[0]).stem)
         # Validate/parse all input before making any paid model calls.
-        documents, seen_documents = [], set()
-        for path in dict.fromkeys(Path(f).resolve() for f in files):
-            text = read_document(path)
-            document_id = hashlib.sha256(text.encode("utf-8")).hexdigest()
-            if document_id in seen_documents:
-                continue
-            seen_documents.add(document_id)
-            parts = split_semantic(
-                text, max_chars=self.settings.chunk_max_chars, overlap=self.settings.chunk_overlap
-            )
-            if not parts:
-                raise ValueError(f"文件没有可提取文本: {path.name}；扫描版 PDF 需要先做 OCR")
-            documents.append((path, document_id, parts))
-        chunks: list[Chunk] = []
+        return self.build_chunks(self.ingestion.prepare([Path(p) for p in files], self.settings), name)
+
+    def build_chunks(self, chunks: Iterable[Chunk | dict], name: str) -> dict:
+        """Index preprocessed chunks from any parser, OCR system or RAG framework.
+
+        Inputs are copied/validated before model calls; supplied metadata and IDs
+        survive storage and citations. Enrichment is optional as for file builds.
+        """
+        if not self.extensions.can_build:
+            raise ValueError("当前知识库由外部服务管理，请在该服务中构建或更新资料")
+        kb = self._new_index(name)
+        prepared = [Chunk.model_validate(c.model_dump() if isinstance(c, Chunk) else c) for c in chunks]
+        if not prepared or any(
+            not c.content.strip() or not c.id.strip() or not c.source.strip() for c in prepared
+        ):
+            raise ValueError("知识块必须包含非空 id、content 和 source")
+        if len({c.id for c in prepared}) != len(prepared):
+            raise ValueError("知识块 ID 重复")
         failures, repairs = [], 0
-        for path, document_id, parts in documents:
-            for i, (content, chapter, page) in enumerate(parts):
-                summary = content[:160] if self.settings.enrich_enabled else content
-                tags = [chapter] if chapter else []
-                if self.settings.enrich_enabled:
-                    try:
-                        enriched, retried = self._enrich(content, chapter)
-                        repairs += retried
-                        summary, tags = enriched.summary, enriched.tags
-                    except Exception as exc:
-                        failures.append({"source": str(path), "index": i, "error_type": type(exc).__name__})
-                        log.warning("块 %s enrichment 失败，使用离线摘要: %s", i, exc)
-                identity = json.dumps([document_id, i, page, chapter, content], ensure_ascii=False)
-                chunks.append(
-                    Chunk(
-                        id=hashlib.sha256(identity.encode()).hexdigest(),
-                        content=content,
-                        summary=summary,
-                        tags=tags,
-                        source=str(path),
-                        chapter=chapter,
-                        page=page,
-                    )
-                )
-        count = kb.build(chunks)
+        for i, chunk in enumerate(prepared):
+            if not chunk.summary:
+                chunk.summary = chunk.content
+            if self.settings.enrich_enabled:
+                try:
+                    enriched, retried = self._enrich(chunk.content, chunk.chapter)
+                    repairs += retried
+                    chunk.summary, chunk.tags = enriched.summary, enriched.tags
+                except Exception as exc:
+                    failures.append({"source": chunk.source, "index": i, "error_type": type(exc).__name__})
+                    log.warning("块 %s enrichment 失败，使用原文摘要: %s", i, exc)
+        count = kb.build(prepared)
         with self._cache_lock:
             self._cache.pop(kb.name, None)
         return {
             "name": kb.name,
             "chunks": count,
-            "path": str(kb.root),
-            "embedding": self.settings.embedding_identity(),
+            "path": kb.location,
+            "embedding": getattr(self.providers, "embedding_identity", self.settings.embedding_identity)(),
             "enrichment_repairs": repairs,
             "enrichment_failures": failures,
             "warnings": [f"{len(failures)} 个知识块的摘要生成失败，已使用原文摘要"] if failures else [],
@@ -213,7 +232,9 @@ class ERAGEngine:
         }
         try:
             data = self.providers.json(
-                CONTEXT_PLAN_PROMPT if self.settings.contextual_ranking else PLAN_PROMPT,
+                self._prompt("context_plan", CONTEXT_PLAN_PROMPT)
+                if self.settings.contextual_ranking
+                else self._prompt("plan", PLAN_PROMPT),
                 payload,
                 retrieval=True,
             )
@@ -239,7 +260,7 @@ class ERAGEngine:
                     previous_assistant = history[-1]["content"] if history[-1]["role"] == "assistant" else ""
                     try:
                         repaired = self.providers.json(
-                            REFERENCE_REPAIR_PROMPT,
+                            self._prompt("reference_repair", REFERENCE_REPAIR_PROMPT),
                             {
                                 "previous_user": previous_user,
                                 "previous_assistant": previous_assistant,
@@ -329,7 +350,8 @@ class ERAGEngine:
         unresolved: list[str] | None = None,
     ) -> str:
         data = {"query": query, "plan": plan.model_dump(), "history": history, "context": context}
-        prompt = ANSWER_PROMPT
+        rules = self._prompt("answer_rules", ANSWER_RULES)
+        prompt = rules + "\n只输出 JSON 对象：answer(string)。"
         if unresolved:
             data["unresolved_questions"] = unresolved
             prompt += "\n审查仍未找到 unresolved_questions 的充分证据。针对这些缺口，除非本轮原文明确支持，须说明资料不足；不能猜测原因、数值或关系。"
@@ -340,7 +362,7 @@ class ERAGEngine:
             warnings.append("结构化回答无效，已回退文本生成")
             text = self.providers.chat(
                 [
-                    {"role": "system", "content": ANSWER_RULES + "\n直接输出正文，不使用 JSON 包装。"},
+                    {"role": "system", "content": rules + "\n直接输出正文，不使用 JSON 包装。"},
                     {"role": "user", "content": json.dumps(data, ensure_ascii=False)},
                 ]
             ).strip()
@@ -359,7 +381,7 @@ class ERAGEngine:
         warnings: list[str] = []
         kb = self._kb(kb_name) if kb_name else None
         plan = (
-            self._plan(query, history, sorted({c.chapter for c in kb.chunks}), warnings)
+            self._plan(query, history, kb.chapters, warnings)
             if kb
             else QueryPlan(needs_retrieval=False, key_query=query, sub_queries=[SubQuery(query=query)])
         )
@@ -367,7 +389,7 @@ class ERAGEngine:
         if not plan.needs_retrieval or kb is None:
             answer = self.providers.chat(
                 [
-                    {"role": "system", "content": "你是专业教学助手，简洁准确回答。"},
+                    {"role": "system", "content": self._prompt("chat", "你是专业教学助手，简洁准确回答。")},
                     *history,
                     {"role": "user", "content": query},
                 ]
@@ -400,6 +422,7 @@ class ERAGEngine:
                 top_k=self.settings.per_query_top_k,
                 embedding_cache=embedding_cache,
             )
+            found = [Hit.model_validate(h.model_dump() if isinstance(h, Hit) else h) for h in found]
             candidates = merge_hits(candidates + found)
             focused = self.settings.tct_mode == "focused"
             if round_no > 1 and not focused and {h.chunk.id for h in candidates} == previous_ids:
@@ -428,7 +451,9 @@ class ERAGEngine:
             try:
                 review = Review.model_validate(
                     self.providers.json(
-                        FOCUSED_REVIEW_PROMPT if focused else REVIEW_PROMPT,
+                        self._prompt("focused_review", FOCUSED_REVIEW_PROMPT)
+                        if focused
+                        else self._prompt("review", REVIEW_PROMPT),
                         {
                             "query": query,
                             "sub_queries": [s.model_dump() for s in plan.sub_queries],
@@ -479,7 +504,8 @@ class ERAGEngine:
                 try:
                     revision = GeneratedAnswer.model_validate(
                         self.providers.json(
-                            ANSWER_PROMPT + "\n修订 draft：重新核对原文，为受支持的结论补上正确引用；"
+                            self._prompt("answer_rules", ANSWER_RULES)
+                            + "\n只输出 JSON 对象：answer(string)。\n修订 draft：重新核对原文，为受支持的结论补上正确引用；"
                             "不受支持的内容应删去或明确说明未知，禁止凭空添加编号。",
                             {
                                 "query": query,
@@ -504,12 +530,17 @@ class ERAGEngine:
         )
 
     def list_knowledge_bases(self) -> list[str]:
+        if self.extensions.knowledge is not None:
+            return sorted(validate_name(name) for name in self.extensions.knowledge.list(self.settings))
         return list_knowledge_bases(self.settings.knowledge_base_root)
 
     def close(self) -> None:
-        self.providers.close()
-        with self._cache_lock:
-            self._cache.clear()
+        try:
+            self.providers.close()
+        finally:
+            with self._cache_lock:
+                self._cache.clear()
+            self.extensions.close()
 
     def __enter__(self) -> ERAGEngine:
         return self

@@ -1,0 +1,18 @@
+{
+  "backend": "vllm",
+  "llm_base_url": "http://127.0.0.1:8000/v1",
+  "llm_model": "erag-chat",
+  "llm_api_key": "local",
+  "llm_extra_body": {"chat_template_kwargs": {"enable_thinking": false}},
+  "embedding_protocol": "openai",
+  "embedding_base_url": "http://127.0.0.1:8001/v1",
+  "embedding_model": "erag-embedding",
+  "embedding_api_key": "local",
+  "embedding_revision": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
+  "embedding_query_template": "Instruct: Given a question, retrieve relevant teaching materials that answer the question\nQuery: {text}",
+  "rerank_enabled": false,
+  "rerank_base_url": "http://127.0.0.1:8002",
+  "rerank_model": "erag-reranker",
+  "rerank_api_key": "local",
+  "rerank_path": "/rerank"
+}

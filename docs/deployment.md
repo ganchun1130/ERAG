@@ -4,7 +4,7 @@
 
 ## 环境
 
-`scripts/remote_runtime.sh` 使用项目内 `.conda/envs/erag`，并将缓存集中到 `.cache/`。运行环境不随源码分发；迁移到新机器后重新创建，已有环境时无需重复创建。也可使用自己管理的 Python 环境，直接运行 `erag-*` 命令。
+`scripts/remote_runtime.sh` 按 `ERAG_PYTHON_PREFIX`、已激活的 `CONDA_PREFIX`、项目内 `.conda/envs/erag` 的顺序选择环境，并将缓存集中到 `.cache/`。运行环境不随源码分发，已有环境时无需重复创建。也可使用自己管理的 Python 环境，直接运行 `erag-*` 命令。以下安装步骤用于 Xinference 部署。
 
 ```bash
 mkdir -p logs .cache .conda/envs
@@ -20,7 +20,7 @@ bash scripts/remote_runtime.sh python -m pip install \
 
 Xinference 1.13 使用 FastAPI 0.136.3、Transformers 4.53.3；更新前需验证模型请求。当前配置使用 `request_limits=1` 和模型级串行门控。不要设置 `max_num_seqs=1`，该版本会进入不受支持的 Qwen3 非批处理路径。
 
-## 下载和启动
+## Xinference：下载和启动
 
 ```bash
 bash scripts/remote_runtime.sh erag-download
@@ -47,6 +47,26 @@ ssh -N -J my-jump -L 7860:127.0.0.1:7860 user@GPU_HOST
 ```
 
 打开 <http://127.0.0.1:7860>，上传自己的资料。空目录启动不需要示例教材或评测数据。
+
+## 使用其他部署引擎
+
+ERAG 客户端只需 `pip install -e .`，可以与模型服务使用不同的 Python 环境。vLLM、Ollama 或云端 API 的配置见 [自定义指南](customization.md)；无需安装 Xinference。`erag-server` / `erag-models` 仅用于上述 Xinference 流程。
+
+例如，先用 `erag-download` 下载模型，再在 vLLM 环境中分别启动以下服务。将三个变量设为实际模型目录；可通过 `erag-download --dry-run` 查看资源清单。不同终端启动，每个服务占用一张空闲 GPU：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 vllm serve "$CHAT_MODEL_DIR" --host 127.0.0.1 --port 8000 \
+  --served-model-name erag-chat --max-model-len 8192
+CUDA_VISIBLE_DEVICES=1 vllm serve "$EMBEDDING_MODEL_DIR" --host 127.0.0.1 --port 8001 \
+  --served-model-name erag-embedding --runner pooling --max-model-len 4096
+CUDA_VISIBLE_DEVICES=2 vllm serve "$RERANKER_MODEL_DIR" --host 127.0.0.1 --port 8002 \
+  --served-model-name erag-reranker --runner pooling --max-model-len 4096 \
+  --hf-overrides '{"architectures":["Qwen3ForSequenceClassification"],"classifier_from_token":["no","yes"],"is_original_qwen3_reranker":true}'
+```
+
+上面的第三条命令用于原版 Qwen3-Reranker；其他重排模型按其模型文档配置。将 `config/profiles/vllm.json` 中的 `rerank_enabled` 改为 `true` 后，运行 `erag-check --config config/profiles/vllm.json`，再用同一配置启动网页。只有聊天需求时只启动第一项并使用 `erag-check --chat-only`。
+
+该路径已用 vLLM 0.28.0 验证；不同版本和硬件的安装及参数以 [vLLM 在线服务](https://docs.vllm.ai/en/stable/serving/online_serving/) 和 [重排模型说明](https://docs.vllm.ai/en/stable/models/pooling_models/scoring/) 为准。实际链路验收记录见 [真实模型验证](customization.md#真实模型验证)。
 
 ## 清理边界
 

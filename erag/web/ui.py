@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import uuid
 from html import escape
 from pathlib import Path
@@ -9,6 +10,7 @@ from pathlib import Path
 import gradio as gr
 
 from erag.schemas import Hit
+from erag.settings import Settings
 
 from .css import complete_css
 from .functions import (
@@ -67,10 +69,15 @@ def create_interface(*, history_path: Path | None = None):
                     label="补充检索（TCT）",
                     info="证据不足时尝试补查，回答可能需要更长时间。",
                 )
-            with gr.Accordion("添加知识", open=False, elem_classes="sidebar-section"):
+            with gr.Accordion(
+                "添加知识",
+                open=False,
+                elem_classes="sidebar-section",
+                visible=get_engine().extensions.can_build,
+            ):
                 files = gr.File(
                     file_count="multiple",
-                    file_types=[".pdf", ".txt", ".md", ".markdown", ".csv"],
+                    file_types=get_engine().upload_extensions,
                     label="上传资料",
                     height=130,
                 )
@@ -78,6 +85,8 @@ def create_interface(*, history_path: Path | None = None):
                 build_btn = gr.Button("构建知识库", size="sm")
                 build_status = gr.Markdown()
                 refresh_btn = gr.Button("刷新知识库", size="sm")
+            if not get_engine().extensions.can_build:
+                gr.Markdown("知识库由外部服务管理，请在该服务中更新资料。")
             gr.HTML(
                 '<div class="sidebar-note">每一次好奇，都值得被记住。<br>对话自动保存，可随时回来继续。</div>'
             )
@@ -349,7 +358,14 @@ def create_interface(*, history_path: Path | None = None):
 
 
 def main() -> None:
-    settings = get_engine().settings
+    parser = argparse.ArgumentParser(description="ERAG 知识小站")
+    parser.add_argument("--config", type=Path, help="与 CLI 共用的 JSON 配置文件")
+    parser.add_argument("--env-file", help="可选 .env 路径")
+    args = parser.parse_args()
+    options = {"_env_file": args.env_file} if args.env_file else {}
+    if args.config:
+        options["config_file"] = args.config
+    settings = get_engine(Settings(**options)).settings
     create_interface().launch(
         server_name=settings.ui_host,
         server_port=settings.ui_port,

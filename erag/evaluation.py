@@ -11,8 +11,8 @@ from time import perf_counter
 import numpy as np
 from pydantic import BaseModel, Field
 
-from .knowledge import KnowledgeBase
-from .schemas import QueryText
+from .extensions import KnowledgeIndex
+from .schemas import QueryText, SubQuery
 
 
 class EvaluationCase(BaseModel):
@@ -37,7 +37,14 @@ def ranking_metrics(retrieved: list[str], relevant: set[str], k: int) -> dict[st
 
 
 def evaluate_retrieval(
-    kb: KnowledgeBase, cases_path: Path, *, k: int = 5, use_tags: bool = True, rerank: bool = False
+    kb: KnowledgeIndex,
+    cases_path: Path,
+    *,
+    k: int = 5,
+    use_tags: bool = True,
+    rerank: bool = False,
+    settings=None,
+    providers=None,
 ) -> dict:
     if k < 1:
         raise ValueError("top-k 必须大于 0")
@@ -49,23 +56,34 @@ def evaluate_retrieval(
     ]
     if not cases:
         raise ValueError("评测集不能为空")
-    kb.load()
-    known = {chunk.id for chunk in kb.chunks}
-    missing = set().union(*(case.relevant_chunk_ids for case in cases)) - known
-    if missing:
-        raise ValueError(f"评测标签包含当前索引不存在的块 ID: {sorted(missing)[:5]}；请核对索引版本")
+    kb = kb.load()
+    settings = settings or getattr(kb, "settings", None)
+    providers = providers or getattr(kb, "providers", None)
+    if settings is None or (rerank and providers is None):
+        raise ValueError("自定义索引评测需要显式传入 settings 和重排所需 providers")
+    label_validation = "unavailable_for_external_index"
+    if hasattr(kb, "chunks"):
+        known = {chunk.id for chunk in kb.chunks}
+        missing = set().union(*(case.relevant_chunk_ids for case in cases)) - known
+        if missing:
+            raise ValueError(f"评测标签包含当前索引不存在的块 ID: {sorted(missing)[:5]}；请核对索引版本")
+        label_validation = "all_ids_present"
     # Capture this snapshot before remote calls; a concurrent rebuild may replace the manifest.
-    manifest = kb.manifest
+    manifest = getattr(kb, "manifest", None)
+    if manifest is None:
+        manifest = {"name": kb.name, "cache_token": str(kb.cache_token())}
     rows = []
     for case in cases:
         start = perf_counter()
         # Same candidate budget across ablations, independent of the final metric cutoff.
-        hits = kb.search(
-            case.query, key_query=case.query if use_tags else None, top_k=max(k, kb.settings.final_top_k)
+        hits = kb.search_many(
+            [SubQuery(query=case.query)],
+            key_query=case.query if use_tags else None,
+            top_k=max(k, settings.final_top_k),
         )
         if rerank and hits:
             # Fail the experiment on service failure instead of silently measuring a fallback.
-            hits = kb.providers.rerank(case.query, hits)
+            hits = providers.rerank(case.query, hits)
         identities = [hit.chunk.id for hit in hits[:k]]
         rows.append(
             {
@@ -91,12 +109,13 @@ def evaluate_retrieval(
         "configuration": {
             "use_tags": use_tags,
             "rerank": rerank,
-            "rerank_model": kb.settings.rerank_model if rerank else None,
-            "candidate_top_k": max(k, kb.settings.final_top_k),
-            "summary_min_score": kb.settings.summary_min_score,
-            "tag_min_score": kb.settings.tag_min_score,
+            "rerank_model": settings.rerank_model if rerank else None,
+            "candidate_top_k": max(k, settings.final_top_k),
+            "summary_min_score": settings.summary_min_score,
+            "tag_min_score": settings.tag_min_score,
         },
         "index": manifest,
+        "label_validation": label_validation,
         "cases_sha256": hashlib.sha256(raw).hexdigest(),
         "cases": rows,
     }

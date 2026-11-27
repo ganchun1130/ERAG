@@ -1,0 +1,14 @@
+{
+  "backend": "ollama",
+  "llm_base_url": "http://127.0.0.1:11434",
+  "llm_api_key": "",
+  "llm_model": "qwen3:8b",
+  "llm_extra_body": {"think": false},
+  "embedding_protocol": "ollama",
+  "embedding_base_url": "http://127.0.0.1:11434",
+  "embedding_api_key": "",
+  "embedding_model": "qwen3-embedding:0.6b",
+  "embedding_revision": "replace-with-your-local-model-digest",
+  "embedding_query_template": "Instruct: Given a question, retrieve relevant teaching materials that answer the question\nQuery: {text}",
+  "rerank_enabled": false
+}

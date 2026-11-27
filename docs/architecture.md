@@ -9,6 +9,8 @@ ERAG 将界面、问答逻辑、知识库和外部模型服务分开。模型可
 | `erag.providers` | LLM、Embedding、Reranker 的协议适配、连接复用和响应校验 |
 | `erag.lexical` | BM25 与 RRF 融合 |
 | `erag.settings` / `schemas` | 配置与输入输出契约 |
+| `erag.extensions` / `ingestion` | 可替换能力的版本化契约、入库流水线、扩展工厂 |
+| `erag.integrations` | 可选 JSONL 入库、外部 HTTP 检索桥 |
 | `erag.web` | Gradio 聊天界面、SQLite 会话、来源展示 |
 | `erag.services` | 模型服务器启动、加载及真实健康检查 |
 | `erag.resources` | 固定版本下载、校验与下载状态记录 |
@@ -29,3 +31,11 @@ ERAG 将界面、问答逻辑、知识库和外部模型服务分开。模型可
 TCT 有最大轮数、重复查询和无进展终止条件；审查通过与引用编号合法都不构成语义正确性的保证。资料缺失、同名实体与歧义追问仍需结合实际资料核对。
 
 Xinference 的当前部署采用模型级跨进程请求锁，避免该版本 Transformers 调度器的并发解码问题；不同模型副本可并行。部署兼容性约束见 [部署指南](deployment.md)。
+
+## 扩展决策
+
+默认索引与问答策略继续可用；通过 `Extensions` 替换模型、入库或知识库，CLI 和网页统一实例化该工厂。Engine 通过 `KnowledgeIndex` 的检索与版本接口工作，不再依赖外部索引拥有本地 manifest 或加载全部 chunks。没有可靠版本标记的外部库不进入引擎缓存。
+
+配置模板解决兼容 API 的地址与参数差异，Python 组件处理原生协议与业务逻辑差异。外部组件不隐式执行文档里的代码；工厂仅从可信服务端配置加载。模型异常与向量身份不匹配继续明确失败，保持原子本地快照和引用来源校验。
+
+接口示例与当前边界见 [自定义指南](customization.md)。

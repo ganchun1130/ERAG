@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Run a command in the project-local conda environment without changing shell startup files.
+# Run in a selected Python environment without changing shell startup files.
 set -euo pipefail
 ERAG_PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-ERAG_PYTHON_PREFIX="$ERAG_PROJECT_ROOT/.conda/envs/erag"
+ERAG_PYTHON_PREFIX="${ERAG_PYTHON_PREFIX:-${CONDA_PREFIX:-$ERAG_PROJECT_ROOT/.conda/envs/erag}}"
 if [[ ! -x "$ERAG_PYTHON_PREFIX/bin/python" ]]; then
     echo "Missing environment: $ERAG_PYTHON_PREFIX (see docs/deployment.md)" >&2
     exit 1

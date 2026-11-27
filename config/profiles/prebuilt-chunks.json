@@ -1,0 +1,4 @@
+{
+  "extension_factory": "erag.integrations.chunks:create_extensions",
+  "enrich_enabled": false
+}

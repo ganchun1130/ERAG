@@ -147,6 +147,28 @@ class KnowledgeBase:
     def manifest_path(self) -> Path:
         return self.root / "manifest.json"
 
+    @property
+    def location(self) -> str:
+        return str(self.root)
+
+    @property
+    def chapters(self) -> list[str]:
+        return sorted({c.chapter for c in self.chunks if c.chapter})
+
+    def embedding_identity(self) -> dict:
+        identity = getattr(self.providers, "embedding_identity", self.settings.embedding_identity)
+        return identity()
+
+    def cache_token(self) -> tuple:
+        stat = self.manifest_path.stat()
+        return (
+            str(self.root),
+            stat.st_mtime_ns,
+            stat.st_size,
+            stat.st_ino,
+            json.dumps(self.embedding_identity(), sort_keys=True),
+        )
+
     @staticmethod
     def _validate_vectors(vectors: np.ndarray, count: int) -> np.ndarray:
         if (
@@ -198,7 +220,7 @@ class KnowledgeBase:
                 "version": 4,
                 "name": self.name,
                 "snapshot": snapshot,
-                "embedding": self.settings.embedding_identity(),
+                "embedding": self.embedding_identity(),
                 "chunk_count": len(chunks),
                 "dimensions": summaries.shape[1],
             }
@@ -221,7 +243,7 @@ class KnowledgeBase:
         manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
         if manifest.get("version") not in {2, 3, 4}:
             raise ValueError("不支持的知识库版本，请重新构建")
-        if manifest.get("embedding") != self.settings.embedding_identity():
+        if manifest.get("embedding") != self.embedding_identity():
             raise ValueError("知识库使用的 embedding 与当前配置不一致，请重新构建（避免检索失真）")
         directory = self.root
         if manifest["version"] >= 3:

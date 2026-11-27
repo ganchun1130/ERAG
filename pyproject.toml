@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "erag-teaching-assistant"
-version = "2.3.0"
+version = "2.4.0"
 description = "Customizable retrieval-augmented teaching assistant with pluggable models and knowledge pipelines"
 requires-python = ">=3.11"
 dependencies = ["openai>=1.70,<2", "httpx>=0.28,<1", "numpy>=1.26,<3", "pydantic>=2.10,<3", "pydantic-settings>=2.8,<3", "gradio>=6.17,<7", "pypdf>=6,<7", "filelock>=3.16,<4"]

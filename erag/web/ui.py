@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import atexit
 import uuid
 from html import escape
 from pathlib import Path
@@ -12,34 +13,43 @@ import gradio as gr
 from erag.schemas import Hit
 from erag.settings import Settings
 
+from .configuration import WorkspaceRuntime, service_error
 from .css import complete_css
 from .functions import (
     build_knowledge_base,
     format_response_with_sources,
     get_engine,
     list_knowledge_bases,
-    process_query,
 )
 from .history import ChatStore, identifier
+from .settings_panel import SettingsPanel
 
 
-def build(files, name):
+def build(files, name, *, engine=None):
     try:
-        result = build_knowledge_base(files, name)
+        if engine is None:
+            result = build_knowledge_base(files, name)
+            names = list_knowledge_bases()
+        else:
+            paths = [f if isinstance(f, (str, Path)) else f.name for f in (files or [])]
+            result = engine.build_knowledge_base(paths, name.strip() or None)
+            names = engine.list_knowledge_bases()
     except Exception as exc:
-        raise gr.Error(f"构建失败：{exc}") from exc
+        raise gr.Error(service_error(exc)) from None
     for warning in result["warnings"]:
         gr.Warning(warning)
     return (
         f"已完成：{result['name']}，写入 {result['chunks']} 个知识块",
-        gr.update(choices=list_knowledge_bases(), value=result["name"]),
+        gr.update(choices=names, value=result["name"]),
     )
 
 
-def create_interface(*, history_path: Path | None = None):
+def create_interface(*, history_path: Path | None = None, runtime: WorkspaceRuntime | None = None):
     settings = get_engine().settings
     store = ChatStore(history_path or settings.knowledge_base_root.parent / "chat_history.sqlite3")
     store.recover_interrupted()
+    runtime = runtime or WorkspaceRuntime(settings, store.path.parent)
+    atexit.register(runtime.close)
     initial = list_knowledge_bases()
     default_kb = initial[0] if initial else ""
     with gr.Blocks(title="ERAG · 知识小站") as demo:
@@ -62,6 +72,7 @@ def create_interface(*, history_path: Path | None = None):
                 undo = gr.Button("撤销最近一次删除", size="sm")
             gr.Markdown("### 我的知识空间", elem_id="tools-title")
             kb = gr.Dropdown([("普通聊天", ""), *initial], value=default_kb, label="知识库")
+            panel = SettingsPanel()
             with gr.Accordion("检索设置", open=False, elem_classes="sidebar-section"):
                 rerank = gr.Checkbox(value=settings.rerank_enabled, label="重排检索结果")
                 tct = gr.Checkbox(
@@ -74,7 +85,7 @@ def create_interface(*, history_path: Path | None = None):
                 open=False,
                 elem_classes="sidebar-section",
                 visible=get_engine().extensions.can_build,
-            ):
+            ) as upload_panel:
                 files = gr.File(
                     file_count="multiple",
                     file_types=get_engine().upload_extensions,
@@ -85,8 +96,9 @@ def create_interface(*, history_path: Path | None = None):
                 build_btn = gr.Button("构建知识库", size="sm")
                 build_status = gr.Markdown()
                 refresh_btn = gr.Button("刷新知识库", size="sm")
-            if not get_engine().extensions.can_build:
-                gr.Markdown("知识库由外部服务管理，请在该服务中更新资料。")
+            external_note = gr.Markdown(
+                "知识库由外部服务管理，请在该服务中更新资料。", visible=not get_engine().extensions.can_build
+            )
             gr.HTML(
                 '<div class="sidebar-note">每一次好奇，都值得被记住。<br>对话自动保存，可随时回来继续。</div>'
             )
@@ -144,6 +156,11 @@ def create_interface(*, history_path: Path | None = None):
             undo,
             build_btn,
             refresh_btn,
+            upload_panel,
+            files,
+            external_note,
+            panel.save,
+            panel.reset,
         ]
 
         def state_value(value):
@@ -171,8 +188,14 @@ def create_interface(*, history_path: Path | None = None):
                 displayed.append({"role": "assistant", "content": answer})
             rows = store.list(owner)
             choices = [(row["title"], row["id"]) for row in rows]
-            names = list_knowledge_bases()
-            selected = current["kb"] if current["kb"] in names else ""
+            with runtime.use(owner) as workspace:
+                names = workspace.engine.list_knowledge_bases()
+                scope = workspace.scope
+                can_build = workspace.engine.extensions.can_build
+                extensions = workspace.engine.upload_extensions
+                rank_disabled = runtime.profiles.load(owner)[1].rerank.protocol == "disabled"
+            mismatch = bool(current["kb"] and current["scope"] != scope)
+            selected = current["kb"] if not mismatch and current["kb"] in names else ""
             heading = (
                 '<div class="chat-heading"><b>'
                 + escape(current["title"])
@@ -190,19 +213,34 @@ def create_interface(*, history_path: Path | None = None):
                 heading,
                 displayed,
                 gr.update(choices=[("普通聊天", ""), *names], value=selected, interactive=not busy),
-                gr.update(value=bool(current["rerank"]), interactive=not busy),
+                gr.update(
+                    value=bool(current["rerank"]) and not rank_disabled,
+                    interactive=not busy and not rank_disabled,
+                ),
                 gr.update(value=bool(current["tct"]), interactive=not busy),
                 gr.update(value=current["title"], interactive=not busy),
                 control(),
                 control(),
-                control(),
-                control(bool(current["turns"])),
+                control(not mismatch),
+                control(bool(current["turns"]) and not mismatch),
                 gr.update(interactive=busy),
                 control(),
                 gr.update(**({"value": ""} if clear else {}), interactive=not busy),
-                notice or ("正在生成 · 可以随时停止" if busy else ""),
+                notice
+                or (
+                    "此对话的知识库属于另一配置。恢复原设置后可继续，或新建对话。"
+                    if mismatch
+                    else "正在生成 · 可以随时停止"
+                    if busy
+                    else ""
+                ),
                 gr.update(value=store.export(owner, active) if not busy else None, interactive=not busy),
                 control(),
+                control(),
+                control(),
+                gr.update(visible=can_build),
+                gr.update(file_types=extensions),
+                gr.update(visible=not can_build),
                 control(),
                 control(),
             )
@@ -215,18 +253,25 @@ def create_interface(*, history_path: Path | None = None):
             rows = store.list(owner)
             active = (value or {}).get("active")
             if active not in {row["id"] for row in rows}:
-                active = (
-                    rows[0]["id"]
-                    if rows
-                    else store.create(
-                        owner, kb=default_kb or None, rerank=settings.rerank_enabled, tct=settings.tct_enabled
-                    )
-                )
+                active = rows[0]["id"] if rows else create_chat(owner)
             return render({"owner": owner, "active": active})
+
+        def create_chat(owner, selected=None, rank=None, feedback=None):
+            with runtime.use(owner) as workspace:
+                engine = workspace.engine
+                names = engine.list_knowledge_bases()
+                selected = selected if selected in names else (names[0] if selected is None and names else "")
+                return store.create(
+                    owner,
+                    kb=selected or None,
+                    scope=workspace.scope,
+                    rerank=engine.settings.rerank_enabled if rank is None else rank,
+                    tct=engine.settings.tct_enabled if feedback is None else feedback,
+                )
 
         def new_chat(value, selected, rank, feedback):
             owner, _ = state_value(value)
-            active = store.create(owner, kb=selected or None, rerank=rank, tct=feedback)
+            active = create_chat(owner, selected, rank, feedback)
             return render({"owner": owner, "active": active}, clear=True)
 
         def select_chat(active, value):
@@ -256,31 +301,37 @@ def create_interface(*, history_path: Path | None = None):
         def configure(value, selected, rank, feedback):
             owner, active = state_value(value)
             current = store.get(owner, active)
-            if (current["kb"] or "") != selected and current["turns"]:
+            with runtime.use(owner) as workspace:
+                scope = workspace.scope
+            if ((current["kb"] or "") != selected or current["scope"] != scope) and current["turns"]:
                 return new_chat(value, selected, rank, feedback)
-            store.configure(owner, active, kb=selected or None, rerank=rank, tct=feedback)
+            store.configure(owner, active, kb=selected or None, rerank=rank, tct=feedback, scope=scope)
             return render(value)
 
         def generate(text, value, selected, rank, feedback, *, regenerate=False):
             owner, active = state_value(value)
-            store.configure(owner, active, kb=selected or None, rerank=rank, tct=feedback)
-            try:
-                turn_id, text = store.begin(owner, active, text or "", retry=regenerate)
-            except ValueError as exc:
-                raise gr.Error(str(exc)) from exc
-            yield render(value, clear=True)
-            history = store.model_history(owner, active)
-            try:
-                result = process_query(
-                    text, selected or None, history=history, rerank_enabled=rank, tct_enabled=feedback
+            with runtime.use(owner, rerank=rank, tct=feedback, operation=True) as workspace:
+                current = store.get(owner, active)
+                if current["kb"] and current["scope"] != workspace.scope:
+                    raise gr.Error("请先恢复此对话的知识库配置，或新建对话")
+                store.configure(
+                    owner, active, kb=selected or None, rerank=rank, tct=feedback, scope=workspace.scope
                 )
-                accepted = store.finish(
-                    owner, active, turn_id, result.answer, [h.model_dump() for h in result.sources]
-                )
-                notice = " · ".join(result.warnings)
-            except Exception as exc:
-                accepted = store.finish(owner, active, turn_id, str(exc), [], error=True)
-                notice = "回答暂时失败，请检查模型服务后重新生成。"
+                try:
+                    turn_id, text = store.begin(owner, active, text or "", retry=regenerate)
+                except ValueError as exc:
+                    raise gr.Error(str(exc)) from exc
+                yield render(value, clear=True)
+                history = store.model_history(owner, active)
+                try:
+                    result = workspace.engine.ask(text, selected or None, history=history)
+                    accepted = store.finish(
+                        owner, active, turn_id, result.answer, [h.model_dump() for h in result.sources]
+                    )
+                    notice = " · ".join(result.warnings)
+                except Exception as exc:
+                    notice = service_error(exc)
+                    accepted = store.finish(owner, active, turn_id, notice, [], error=True)
             if accepted:
                 yield render(value, notice=notice)
 
@@ -301,18 +352,76 @@ def create_interface(*, history_path: Path | None = None):
             )
 
         def build_and_select(files, name, value, rank, feedback):
-            working = list(render(value, notice="正在构建知识库…"))
-            for index in [1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19]:
-                working[index] = gr.update(interactive=False)
-            yield ("正在读取资料并构建索引…", *working)
-            try:
-                notice, selection = build(files, name)
-            except Exception as exc:
-                yield (f"构建失败：{escape(str(exc))}", *render(value))
-                return
-            yield (notice, *configure(value, selection["value"], rank, feedback))
+            owner, _ = state_value(value)
+            with runtime.use(owner, operation=True) as workspace:
+                working = list(render(value, notice="正在构建知识库…"))
+                for index in [1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 23, 24]:
+                    working[index] = gr.update(interactive=False)
+                yield ("正在读取资料并构建索引…", *working)
+                try:
+                    notice, selection = build(files, name, engine=workspace.engine)
+                except Exception:
+                    yield ("构建失败，请检查资料格式与嵌入模型连接。", *render(value))
+                    return
+                yield (notice, *configure(value, selection["value"], rank, feedback))
 
-        demo.load(boot, [browser], outputs)
+        def load_settings(value):
+            owner, _ = state_value(value)
+            return panel.values(runtime.profiles.load(owner)[1])
+
+        def save_settings(value, *values):
+            owner, active = state_value(value)
+            profile = panel.draft(runtime, owner, values)
+            try:
+                runtime.apply(owner, profile)
+            except ValueError:
+                raise gr.Error("设置未保存，请确认当前请求已完成，且项目扩展与新设置兼容。") from None
+            current = store.get(owner, active)
+            with runtime.use(owner) as workspace:
+                changed = current["scope"] != workspace.scope
+            if changed:
+                active = create_chat(owner)
+            result = render(
+                {"owner": owner, "active": active},
+                notice="设置已保存。"
+                + ("已开启新对话，原对话和知识库仍保留。" if changed else "后续请求将使用新设置。"),
+            )
+            return ("已保存到当前工作空间。", *panel.values(profile), *result)
+
+        def reset_settings(value):
+            owner, _ = state_value(value)
+            defaults = runtime.profiles.defaults
+            # Reuse the publication path, explicitly clearing all previously stored credentials.
+            values = [item["value"] for item in panel.values(defaults)]
+            for index, field in enumerate(panel.fields):
+                if field.endswith(".clear") or field == "external_clear":
+                    values[index] = True
+            return save_settings(value, *values)
+
+        def test_settings(role, value, *values):
+            owner, _ = state_value(value)
+            profile = panel.draft(runtime, owner, values)
+            try:
+                return runtime.test(owner, profile, role)
+            except Exception as exc:
+                return service_error(exc) + " 测试不会保存设置。"
+
+        demo.load(boot, [browser], outputs).then(
+            load_settings, [browser], panel.inputs, api_visibility="private"
+        )
+        settings_outputs = [panel.status, *panel.inputs, *outputs]
+        panel.save.click(save_settings, [browser, *panel.inputs], settings_outputs, api_visibility="private")
+        panel.reset.click(reset_settings, [browser], settings_outputs, api_visibility="private")
+        for role, button in [
+            ("chat", panel.test_chat),
+            ("knowledge", panel.test_knowledge),
+            ("rerank", panel.test_rerank),
+        ]:
+
+            def check(value, *values, role=role):
+                return test_settings(role, value, *values)
+
+            button.click(check, [browser, *panel.inputs], [panel.status], api_visibility="private")
         new.click(new_chat, [browser, kb, rerank, tct], outputs)
         sessions.input(select_chat, [sessions, browser], outputs)
         delete.click(delete_chat, [browser], outputs)
@@ -351,9 +460,8 @@ def create_interface(*, history_path: Path | None = None):
         stop.click(stop_chat, [browser], outputs, cancels=jobs, queue=False, show_progress="hidden")
         chatbot.clear(new_chat, [browser, kb, rerank, tct], outputs)
         build_btn.click(build_and_select, [files, kb_name, browser, rerank, tct], [build_status, *outputs])
-        refresh_btn.click(
-            lambda: gr.update(choices=[("普通聊天", ""), *list_knowledge_bases()]), outputs=[kb]
-        )
+        refresh_btn.click(lambda value: render(value), inputs=[browser], outputs=outputs)
+    demo.erag_runtime = runtime
     return demo
 
 

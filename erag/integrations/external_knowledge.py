@@ -34,13 +34,19 @@ class Record(BaseModel):
 
 
 class ExternalRepository:
-    def __init__(self, config: ExternalConfig, timeout: float):
+    def __init__(self, config: ExternalConfig, timeout: float, *, api_key: str | None = None):
         for name, identifier in config.knowledge_bases.items():
             validate_name(name)
             if not identifier.strip():
                 raise ValueError("外部知识库 ID 不能为空")
-        key = os.environ.get(config.api_key_env, "") if config.api_key_env else ""
-        if config.api_key_env and not key:
+        key = (
+            api_key
+            if api_key is not None
+            else os.environ.get(config.api_key_env, "")
+            if config.api_key_env
+            else ""
+        )
+        if api_key is None and config.api_key_env and not key:
             raise ValueError(f"请设置外部知识库密钥环境变量 {config.api_key_env}")
         self.config = config
         self.client = httpx.Client(timeout=timeout, headers={"Authorization": f"Bearer {key}"} if key else {})

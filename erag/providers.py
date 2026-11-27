@@ -228,7 +228,11 @@ class Providers:
                 for text in batch:
                     response = self._http_client().post(
                         self.s.embedding_base_url.rstrip("/") + "/embeddings/multimodal",
-                        headers={"Authorization": "Bearer " + self.s.embedding_api_key.get_secret_value()}
+                        headers=(
+                            {"Authorization": "Bearer " + self.s.embedding_api_key.get_secret_value()}
+                            if self.s.embedding_api_key.get_secret_value()
+                            else {}
+                        )
                         | self._headers(self.s.embedding_headers),
                         json={
                             **self.s.embedding_extra_body,
@@ -281,7 +285,11 @@ class Providers:
             return sorted(ranked, key=lambda h: h.score, reverse=True)
         response = self._http_client().post(
             self.s.rerank_base_url.rstrip("/") + self.s.rerank_path,
-            headers={"Authorization": "Bearer " + self.s.rerank_api_key.get_secret_value()}
+            headers=(
+                {"Authorization": "Bearer " + self.s.rerank_api_key.get_secret_value()}
+                if self.s.rerank_api_key.get_secret_value()
+                else {}
+            )
             | self._headers(self.s.rerank_headers),
             json={
                 **self.s.rerank_extra_body,

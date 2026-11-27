@@ -43,6 +43,8 @@ class ChatStore:
             """)
             if "deleted_at" not in {row[1] for row in db.execute("PRAGMA table_info(conversations)")}:
                 db.execute("ALTER TABLE conversations ADD COLUMN deleted_at TEXT")
+            if "scope" not in {row[1] for row in db.execute("PRAGMA table_info(conversations)")}:
+                db.execute("ALTER TABLE conversations ADD COLUMN scope TEXT NOT NULL DEFAULT ''")
 
     @contextmanager
     def connection(self):
@@ -65,13 +67,13 @@ class ChatStore:
             pass
         return path.read_text()
 
-    def create(self, owner, *, kb=None, rerank=True, tct=False):
+    def create(self, owner, *, kb=None, rerank=True, tct=False, scope=""):
         owner, session = identifier(owner), uuid.uuid4().hex
         now = datetime.now(UTC).isoformat()
         with self.connection() as db:
             db.execute(
-                "INSERT INTO conversations (id,owner,title,kb,rerank,tct,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)",
-                (session, owner, "新对话", kb, int(rerank), int(tct), now, now),
+                "INSERT INTO conversations (id,owner,title,kb,rerank,tct,created_at,updated_at,scope) VALUES (?,?,?,?,?,?,?,?,?)",
+                (session, owner, "新对话", kb, int(rerank), int(tct), now, now, scope),
             )
         return session
 
@@ -105,13 +107,15 @@ class ChatStore:
             turn["sources"] = json.loads(turn["sources"])
         return result
 
-    def configure(self, owner, session, *, kb, rerank, tct):
+    def configure(self, owner, session, *, kb, rerank, tct, scope=None):
         with self.connection() as db:
             self._get(db, owner, session)
             db.execute(
                 "UPDATE conversations SET kb=?,rerank=?,tct=? WHERE id=?",
                 (kb, int(rerank), int(tct), session),
             )
+            if scope is not None:
+                db.execute("UPDATE conversations SET scope=? WHERE id=?", (scope, session))
 
     def model_history(self, owner, session):
         return [

@@ -8,11 +8,10 @@ from pathlib import Path
 from threading import Lock
 
 from erag import ERAGEngine, Settings
-from erag.schemas import Answer, Hit
+from erag.schemas import Hit
 
 _engine: ERAGEngine | None = None
 _engine_lock = Lock()
-_configured_engines: dict[tuple[bool, bool], ERAGEngine] = {}
 
 
 def get_engine(settings: Settings | None = None) -> ERAGEngine:
@@ -33,31 +32,6 @@ def build_knowledge_base(files, name: str | None = None) -> dict:
     if not paths:
         raise ValueError("请选择文件")
     return get_engine().build_knowledge_base(paths, name.strip() if name and name.strip() else None)
-
-
-def process_query(
-    query: str,
-    kb_name: str | None,
-    history: list[dict] | None = None,
-    *,
-    rerank_enabled: bool | None = None,
-    tct_enabled: bool | None = None,
-) -> Answer:
-    engine = get_engine()
-    if rerank_enabled is not None or tct_enabled is not None:
-        key = (
-            engine.settings.rerank_enabled if rerank_enabled is None else rerank_enabled,
-            engine.settings.tct_enabled if tct_enabled is None else tct_enabled,
-        )
-        with _engine_lock:
-            if key not in _configured_engines:
-                configured = engine.settings.model_copy(
-                    update={"rerank_enabled": key[0], "tct_enabled": key[1]}
-                )
-                _configured_engines[key] = ERAGEngine(configured)
-                atexit.register(_configured_engines[key].close)
-            engine = _configured_engines[key]
-    return engine.ask(query, kb_name, history=history)
 
 
 def format_response_with_sources(response: str, sources: list[Hit]) -> str:

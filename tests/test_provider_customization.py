@@ -116,6 +116,21 @@ def test_custom_rerank_path_headers_and_parameters(settings, chunks):
     provider.close()
 
 
+def test_unauthenticated_reranker_omits_empty_bearer_header(settings, chunks):
+    settings.rerank_api_key = SecretStr("")
+    provider = Providers(settings)
+
+    def handler(request):
+        assert "Authorization" not in request.headers
+        return httpx.Response(200, json={"results": [{"index": 0, "score": 0.9}]})
+
+    provider._http = httpx.Client(transport=httpx.MockTransport(handler))
+    from erag.schemas import Hit
+
+    assert provider.rerank("q", [Hit(chunk=chunks[0], score=0, sub_query="q", route="raw")])[0].score == 0.9
+    provider.close()
+
+
 @pytest.mark.parametrize(
     "overrides",
     [

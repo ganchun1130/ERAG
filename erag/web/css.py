@@ -16,7 +16,9 @@ complete_css = """
     --block-title-text-color: #6a8175;
     --block-label-text-color: #6a8175;
     --input-background-fill: #ffffff;
+    --input-background-fill-focus: #ffffff;
     --input-border-color: #e1ebe4;
+    --input-border-color-focus: #a9cbb3;
     --input-placeholder-color: #9cafa3;
     --input-shadow: none;
     --input-shadow-focus: 0 0 0 2px #e4f2e9;
@@ -27,6 +29,7 @@ complete_css = """
     --button-secondary-background-fill: #f2f7f3;
     --button-secondary-background-fill-hover: #e8f2eb;
     --button-secondary-text-color: #567663;
+    --button-secondary-text-color-hover: #365d43;
     --button-secondary-border-color: transparent;
     --button-primary-background-fill: #37866d;
     --button-primary-text-color: #ffffff;
@@ -64,7 +67,20 @@ footer { display: none !important; }
 #tools-title h3 { font-size: 11px; font-weight: 500; color: #9aaa9a; letter-spacing: .05em; }
 #workspace-sidebar input, #workspace-sidebar textarea { color: #4a6654 !important; }
 #workspace-sidebar .secondary { border-radius: 9px !important; font-size: 12px; }
+#workspace-sidebar .secondary:hover { color: #365d43 !important; }
+#workspace-sidebar .file { background: #e8f1e8 !important; color: #4a6654 !important; border-radius: 7px; }
+#workspace-sidebar input[type="checkbox"] { accent-color: #37866d; }
 .sidebar-note { font-size: 10px; line-height: 1.9; color: #a0afa0; padding: 24px 8px 0; }
+.settings-panel .tabs { border: 1px solid #dfe9df !important; border-radius: 12px; background: #f8fbf7 !important; }
+.settings-panel .tab-nav { gap: 0; padding: 3px 5px; }
+.settings-panel .tab-nav button { flex: 1; font-size: 11px; padding: 8px 4px; min-width: 0; }
+.settings-panel .tabitem { padding: 10px !important; max-height: 52vh; overflow-y: auto; scrollbar-width: thin; }
+#workspace-sidebar .settings-panel .block { padding: 4px 0 !important; }
+.settings-panel .settings-group { gap: 8px; min-width: 0; }
+.settings-panel input, .settings-panel textarea { font-size: 12px !important; }
+.settings-panel .settings-hint p { font-size: 10px; color: #809581; line-height: 1.7; }
+.settings-panel .settings-status p { font-size: 11px; line-height: 1.7; color: #527b60; }
+.settings-panel button.primary { border-radius: 10px; font-size: 12px; }
 #chat-main { height: 100dvh; box-sizing: border-box; max-width: 1030px; margin: 0 auto; padding: 0 44px 16px; min-width: 0; gap: 6px; }
 .chat-heading { display: flex; align-items: center; justify-content: space-between; min-height: 69px; border-bottom: 1px solid #edf1eb; gap: 20px; }
 .chat-heading b { font-size: 13px; font-weight: 500; color: #667e6c; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

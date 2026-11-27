@@ -18,7 +18,7 @@ from threading import Thread
 from erag import Chunk, ERAGEngine, Settings
 from erag.engine import citation_issue
 from erag.lexical import BM25
-from erag.schemas import SubQuery
+from erag.schemas import Hit, SubQuery
 
 FACTS = [
     (
@@ -79,6 +79,21 @@ def validate(settings):
             }
         )
         with ERAGEngine(base) as engine:
+            if base.rerank_enabled:
+                query = "中国的首都是哪里？"
+                candidates = [
+                    Hit(
+                        chunk=Chunk(id=str(i), content=text, source="synthetic-health-check"),
+                        score=0,
+                        sub_query=query,
+                        route="health-check",
+                    )
+                    for i, text in enumerate(["北京是中国的首都。", "鲸鱼生活在海洋中。"])
+                ]
+                ranked = engine.providers.rerank(query, candidates)
+                if ranked[0].chunk.id != "0":
+                    raise ValueError("重排语义检查失败，请先核对模型的输入模板并运行 erag-check")
+                report["rerank_semantics"] = [{"id": h.chunk.id, "score": h.score} for h in ranked]
             engine.build_knowledge_base([file], "notes")
             report["routes"]["default_documents"] = run_dialogue(engine, "notes")
 

@@ -55,16 +55,20 @@ ERAG 客户端只需 `pip install -e .`，可以与模型服务使用不同的 P
 例如，先用 `erag-download` 下载模型，再在 vLLM 环境中分别启动以下服务。将三个变量设为实际模型目录；可通过 `erag-download --dry-run` 查看资源清单。不同终端启动，每个服务占用一张空闲 GPU：
 
 ```bash
+mkdir -p .cache/templates
+curl -fL https://raw.githubusercontent.com/vllm-project/vllm/v0.28.0/examples/pooling/score/template/qwen3_reranker.jinja \
+  -o .cache/templates/qwen3_reranker.jinja
 CUDA_VISIBLE_DEVICES=0 vllm serve "$CHAT_MODEL_DIR" --host 127.0.0.1 --port 8000 \
   --served-model-name erag-chat --max-model-len 8192
 CUDA_VISIBLE_DEVICES=1 vllm serve "$EMBEDDING_MODEL_DIR" --host 127.0.0.1 --port 8001 \
   --served-model-name erag-embedding --runner pooling --max-model-len 4096
 CUDA_VISIBLE_DEVICES=2 vllm serve "$RERANKER_MODEL_DIR" --host 127.0.0.1 --port 8002 \
   --served-model-name erag-reranker --runner pooling --max-model-len 4096 \
+  --chat-template .cache/templates/qwen3_reranker.jinja \
   --hf-overrides '{"architectures":["Qwen3ForSequenceClassification"],"classifier_from_token":["no","yes"],"is_original_qwen3_reranker":true}'
 ```
 
-上面的第三条命令用于原版 Qwen3-Reranker；其他重排模型按其模型文档配置。将 `config/profiles/vllm.json` 中的 `rerank_enabled` 改为 `true` 后，运行 `erag-check --config config/profiles/vllm.json`，再用同一配置启动网页。只有聊天需求时只启动第一项并使用 `erag-check --chat-only`。
+重排启动参数用于原版 Qwen3-Reranker；其他重排模型按其模型文档配置。**不要省略重排模板**：模型能返回分数并不代表输入格式正确；实测缺失模板会把无关文档排在相关文档前面。模板固定取自 vLLM 0.28.0 官方仓库。将 `config/profiles/vllm.json` 中的 `rerank_enabled` 改为 `true` 后，运行 `erag-check --config config/profiles/vllm.json`，再用同一配置启动网页。只有聊天需求时只启动聊天模型并使用 `erag-check --config config/profiles/vllm.json --chat-only`。
 
 该路径已用 vLLM 0.28.0 验证；不同版本和硬件的安装及参数以 [vLLM 在线服务](https://docs.vllm.ai/en/stable/serving/online_serving/) 和 [重排模型说明](https://docs.vllm.ai/en/stable/models/pooling_models/scoring/) 为准。实际链路验收记录见 [真实模型验证](customization.md#真实模型验证)。
 
